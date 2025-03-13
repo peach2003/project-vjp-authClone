@@ -9,6 +9,7 @@ class Company {
   final String country;
   final String imageUrl;
   final String group;
+  final String introduction;
 
   Company({
     required this.name,
@@ -19,8 +20,9 @@ class Company {
     required this.category,
     required this.needs,
     required this.country,
-    required this.group,
     required this.imageUrl,
+    required this.group,
+    required this.introduction,
   });
 
   factory Company.fromJson(Map<String, dynamic> json) {
@@ -33,8 +35,9 @@ class Company {
       category: json['category'],
       needs: json['needs'],
       country: json['country'],
+      imageUrl: json['imageUrl'],
       group: json['group'],
-      imageUrl: json['image_url'],
+      introduction: json['introduction'],
     );
   }
 }
