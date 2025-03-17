@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 
 import 'add_friend_screen.dart';
+import 'chat_screen.dart';
 import 'friend_request_screen.dart';
 
 class FriendListScreen extends StatefulWidget {
   final int currentUserId;
-  const FriendListScreen({Key? key, required this.currentUserId}) : super(key: key);
+
+  const FriendListScreen({Key? key, required this.currentUserId})
+    : super(key: key);
 
   @override
   _FriendListScreenState createState() => _FriendListScreenState();
@@ -26,7 +29,9 @@ class _FriendListScreenState extends State<FriendListScreen> {
   Future<void> fetchFriends() async {
     try {
       print("🔄 Đang lấy danh sách bạn bè...");
-      final response = await Dio().get("http://10.0.2.2:3000/friends/list/${widget.currentUserId}");
+      final response = await Dio().get(
+        "http://10.0.2.2:3000/friends/list/${widget.currentUserId}",
+      );
       setState(() {
         friends = List<Map<String, dynamic>>.from(response.data);
         isLoading = false;
@@ -50,7 +55,9 @@ class _FriendListScreenState extends State<FriendListScreen> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AddFriendScreen(currentUserId: widget.currentUserId),
+                  builder:
+                      (context) =>
+                          AddFriendScreen(currentUserId: widget.currentUserId),
                 ),
               );
               fetchFriends(); // 🔥 Reload danh sách bạn bè sau khi quay lại
@@ -62,7 +69,10 @@ class _FriendListScreenState extends State<FriendListScreen> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => FriendRequestScreen(currentUserId: widget.currentUserId),
+                  builder:
+                      (context) => FriendRequestScreen(
+                        currentUserId: widget.currentUserId,
+                      ),
                 ),
               );
               fetchFriends(); // 🔥 Reload danh sách bạn bè ngay sau khi quay lại
@@ -70,20 +80,36 @@ class _FriendListScreenState extends State<FriendListScreen> {
           ),
         ],
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator()) // 🔄 Loading
-          : friends.isEmpty
-          ? Center(child: Text("Chưa có bạn bè")) // ❌ Nếu không có bạn bè
-          : ListView.builder(
-        itemCount: friends.length,
-        itemBuilder: (context, index) {
-          final friend = friends[index];
-          return ListTile(
-            title: Text(friend['username']),
-            trailing: Icon(Icons.chat),
-          );
-        },
-      ),
+      body:
+          isLoading
+              ? Center(child: CircularProgressIndicator()) // 🔄 Loading
+              : friends.isEmpty
+              ? Center(child: Text("Chưa có bạn bè")) // ❌ Nếu không có bạn bè
+              : ListView.builder(
+                itemCount: friends.length,
+                itemBuilder: (context, index) {
+                  final friend = friends[index];
+                  return ListTile(
+                    title: Text(friend['username']),
+                    trailing: IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => ChatScreen(
+                                  currentUserId: widget.currentUserId,
+                                  receiverId: friend['id'],
+                                  receiverName: friend['username'],
+                                ),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.chat),
+                    ),
+                  );
+                },
+              ),
     );
   }
 }
