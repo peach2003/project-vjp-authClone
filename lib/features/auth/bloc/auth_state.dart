@@ -4,19 +4,20 @@ class AuthInitial extends AuthState {}  // Chưa đăng nhập
 
 class AuthLoading extends AuthState {}  // Đang xử lý
 // 🔹 Trạng thái chưa đăng nhập
-class AuthUnauthenticated extends AuthState {}
+class Authenticated extends AuthState {}
+
+class Unauthenticated extends AuthState {}
 
 
-// 🔹 Trạng thái đã đăng nhập với thông tin user
+// 🔹 Trạng thái đã đăng nhập với thông tin user (Fix: Lấy userId thay vì username)
 class AuthAuthenticated extends AuthState {
-  final String username;
+  final int userId;
 
-  AuthAuthenticated(this.username);
+  AuthAuthenticated(this.userId);
 
   @override
-  List<Object> get props => [username];
+  List<Object?> get props => [userId];
 }
-
 class AuthSuccess extends AuthState {}  // Thành công (Đăng nhập/Đăng ký)
 
 class AuthFailure extends AuthState {

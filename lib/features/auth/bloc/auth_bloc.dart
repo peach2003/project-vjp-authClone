@@ -20,13 +20,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     on<LoginEvent>((event, emit) async {
       emit(AuthLoading());
-      final error = await authService.login(event.username, event.password);
-      if (error == null) {
-        emit(AuthSuccess());
+      final userId = await authService.login(event.username, event.password);
+
+      if (userId != null) {
+        print("✅ Authenticated với User ID: $userId"); // Debug kiểm tra
+        emit(AuthAuthenticated(userId)); // ✅ Trả về userId đúng
       } else {
-        emit(AuthFailure(error));
+        print("❌ Lỗi đăng nhập trong AuthBloc");
+        emit(AuthFailure("Lỗi đăng nhập"));
       }
     });
+
 
     on<LogoutEvent>((event, emit) async {
       emit(AuthLoading());
@@ -37,9 +41,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     // 🔹 Kiểm tra trạng thái đăng nhập khi mở ứng dụng
     on<CheckLoginStatusEvent>((event, emit) async {
       emit(AuthLoading());
-      final username = await authService.getLoggedInUser();
-      if (username != null) {
-        emit(AuthAuthenticated(username));
+      final userId = await authService.getLoggedInUserId(); // ✅ Dùng đúng hàm lấy `userId`
+      if (userId != null) {
+        emit(AuthAuthenticated(userId)); // ✅ Trả về `userId` thay vì username (sửa lỗi)
       } else {
         emit(AuthInitial()); // Chưa đăng nhập
       }
