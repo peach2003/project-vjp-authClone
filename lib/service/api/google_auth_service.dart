@@ -8,7 +8,7 @@ class GoogleAuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final Dio _dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3000"));
 
-  Future<String?> signInWithGoogle() async {
+  Future signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return "Đăng nhập bị hủy";
@@ -36,14 +36,17 @@ class GoogleAuthService {
       if (response.statusCode == 200) {
         String token = response.data["token"];
         String role = response.data["role"];
+        int? userId = response.data["userId"]; // ✅ Lấy userId từ API
 
         // Lưu token vào SharedPreferences
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString("token", token);
         await prefs.setString("username", email);
         await prefs.setString("role", role);
+        await prefs.setInt("userId", userId!); // ✅ Lưu userId
 
-        return null; // Đăng nhập thành công
+        print("✅ Đăng nhập Google thành công! User ID: $userId, Role: $role");
+        return userId; // ✅ Trả về userId để Bloc xử l
       } else {
         return response.data["error"];
       }

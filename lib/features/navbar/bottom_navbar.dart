@@ -20,7 +20,7 @@ class _BottomNavbarState extends State<BottomNavbar> {
     Text('Search Screen'),
     FriendListScreen(currentUserId: currentUserId), // ✅ Thêm danh sách bạn bè
     Text('Feed Screen'),
-    PersonScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -35,8 +35,8 @@ class _BottomNavbarState extends State<BottomNavbar> {
       body: Center(child: _widgetOptions(widget.currentUserId).elementAt(_selectedIndex)),
       bottomNavigationBar: CurvedNavigationBar(
         backgroundColor: Colors.transparent,
-        color: Color.fromARGB(255, 250, 201, 5),
-        buttonBackgroundColor: Color.fromARGB(255, 251, 215, 64),
+        color: Color.fromARGB(255, 249, 213, 63),
+        buttonBackgroundColor: Color.fromARGB(255, 249, 213, 63),
         height: 65,
         items: <Widget>[
           _buildIcon(Icons.home_outlined, 0),
@@ -58,7 +58,7 @@ class _BottomNavbarState extends State<BottomNavbar> {
       duration: Duration(milliseconds: 300),
       width: _selectedIndex == index ? 40 : 30,
       height: _selectedIndex == index ? 40 : 30,
-      child: Icon(icon, color: Colors.white),
+      child: Icon(icon, color: Color.fromARGB(255, 242, 66, 54),),
     );
   }
 }

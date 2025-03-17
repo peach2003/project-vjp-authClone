@@ -36,7 +36,7 @@ class AuthService {
       print("🔹 API Response: ${response.data}"); // Debug xem API trả về gì
 
       int? userId = response.data['userId']; // ✅ Đảm bảo API trả về userId hợp lệ
-
+      String? role = response.data['role']; // ✅ Lấy role từ API
       if (userId == null || userId == 0) {
         print("❌ Lỗi: API không trả về userId hợp lệ");
         return null;
@@ -48,15 +48,18 @@ class AuthService {
       await prefs.setString("username", username);
       await prefs.setString("role", response.data['role'] ?? "unknown");
 
-      print("✅ Đăng nhập thành công! User ID: $userId");
+      print("✅ Đăng nhập thành công! User ID: $userId, Role: $role");
       return userId;
     } catch (e) {
       print("❌ Lỗi đăng nhập: $e");
       return null;
     }
   }
-
-
+  // 🔹 Lấy role từ SharedPreferences
+  Future<String?> getUserRole() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString("role");
+  }
 
   // 🔹 Đăng xuất
   Future<void> logout() async {
