@@ -5,6 +5,8 @@ import 'package:auth_clone/features/auth/bloc/auth_event.dart';
 import 'package:auth_clone/service/api/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'update_user_role_screens.dart';
+
 class ProfileScreen extends StatefulWidget {
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -34,6 +36,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: Text("Thông Tin Cá Nhân", style: TextStyle(color: Colors.white),),
         centerTitle: true,
+        actions: [
+          if (role == "operator") // Chỉ hiển thị nếu user có quyền operator
+            IconButton(
+              icon: Icon(Icons.admin_panel_settings_outlined, size: 30, color: Colors.white,),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UpdateUserRoleScreen(),
+                  ),
+                );
+              },
+            ),
+        ],
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
