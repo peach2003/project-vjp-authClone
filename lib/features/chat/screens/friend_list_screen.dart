@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 
 import 'add_friend_screen.dart';
 import 'chat_screen.dart';
+import 'create_group_screen.dart';
 import 'friend_request_screen.dart';
+import 'group_chat_screen.dart';
 
 class FriendListScreen extends StatefulWidget {
   final int currentUserId;
@@ -18,51 +21,82 @@ class FriendListScreen extends StatefulWidget {
 
 class _FriendListScreenState extends State<FriendListScreen> {
   List<Map<String, dynamic>> friends = [];
-  bool isLoading = true;
+  List<Map<String, dynamic>> groups = [];
+  bool isLoadingFriends = true;
+  bool isLoadingGroups = true;
 
   @override
   void initState() {
     super.initState();
-    fetchFriends(); // Gọi API khi mở màn hình
+    fetchFriends();
+    fetchGroups();
+    startAutoRefresh();
   }
 
-  // 🔹 Hàm fetch danh sách bạn bè từ API
+  // 🔹 Tự động refresh danh sách bạn bè & nhóm mỗi 3 giây
+  void startAutoRefresh() {
+    Timer.periodic(Duration(seconds: 3), (timer) {
+      fetchFriends();
+      fetchGroups();
+    });
+  }
+
+  // 🔹 Lấy danh sách bạn bè từ API
   Future<void> fetchFriends() async {
     try {
-      print("🔄 Đang lấy danh sách bạn bè...");
       final response = await Dio().get(
         "http://10.0.2.2:3000/friends/list/${widget.currentUserId}",
       );
-      setState(() {
-        friends = List<Map<String, dynamic>>.from(response.data);
-        isLoading = false;
-      });
-      print("✅ Danh sách bạn bè đã cập nhật!");
+      if (mounted) {
+        setState(() {
+          friends = List<Map<String, dynamic>>.from(response.data);
+          isLoadingFriends = false;
+        });
+      }
     } catch (e) {
       print("❌ Lỗi khi lấy danh sách bạn bè: $e");
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoadingFriends = false);
+    }
+  }
+
+  // 🔹 Lấy danh sách nhóm từ API
+  Future<void> fetchGroups() async {
+    try {
+      print("📤 Đang lấy danh sách nhóm từ server...");
+
+      final response = await Dio().get(
+        "http://10.0.2.2:3000/groups/list/${widget.currentUserId}",
+      );
+
+      print("✅ Response từ server: ${response.data}");
+
+      if (mounted) {
+        setState(() {
+          groups = List<Map<String, dynamic>>.from(response.data);
+          isLoadingGroups = false;
+        });
+      }
+    } catch (e) {
+      print("❌ Lỗi khi lấy danh sách nhóm: $e");
+      if (mounted) setState(() => isLoadingGroups = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _buildZaloAppBar(), // ✅ AppBar giống Zalo
-      backgroundColor: Color(0xFFF3F3F3), // ✅ Màu nền xám giống Zalo
+      appBar: _buildZaloAppBar(),
+      backgroundColor: Color(0xFFF3F3F3),
       body: Column(
         children: [
           _buildSearchBar(), // 🔍 Thanh tìm kiếm
           Expanded(
-            child: isLoading
-                ? Center(child: CircularProgressIndicator()) // 🔄 Loading
-                : friends.isEmpty
-                ? Center(child: Text("Chưa có bạn bè", style: TextStyle(fontSize: 17),)) // ❌ Nếu không có bạn bè
-                : ListView.builder(
-              itemCount: friends.length,
-              itemBuilder: (context, index) {
-                final friend = friends[index];
-                return _buildFriendItem(friend); // 🔥 UI giống Zalo
-              },
+            child: ListView(
+              children: [
+                _buildCreateGroupButton(), // 🔥 Nút tạo nhóm
+                _buildFriendList(), // 🔹 Danh sách bạn bè
+                _buildGroupList(), // 🔹 Danh sách nhóm
+              ],
             ),
           ),
         ],
@@ -73,17 +107,14 @@ class _FriendListScreenState extends State<FriendListScreen> {
   // 🔥 **AppBar giống Zalo**
   AppBar _buildZaloAppBar() {
     return AppBar(
-      title: Text("Danh sách bạn bè", style: TextStyle(color: Colors.white),),
+      title: Text("Trò chuyện", style: TextStyle(color: Colors.white)),
       centerTitle: true,
       elevation: 0,
-      systemOverlayStyle: SystemUiOverlayStyle.light, // Trạng thái trắng trên Android
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF007AFF), // Màu xanh đậm Zalo
-              Color(0xFF3E88E1), // Màu xanh nhạt Zalo
-            ],
+            colors: [Color(0xFF007AFF), Color(0xFF3E88E1)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -91,7 +122,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.person_add, color: Colors.white,),
+          icon: Icon(Icons.person_add, color: Colors.white),
           onPressed: () async {
             await Navigator.push(
               context,
@@ -99,21 +130,19 @@ class _FriendListScreenState extends State<FriendListScreen> {
                 builder: (context) => AddFriendScreen(currentUserId: widget.currentUserId),
               ),
             );
-            fetchFriends(); // 🔥 Reload danh sách bạn bè sau khi quay lại
+            fetchFriends();
           },
         ),
         IconButton(
-          icon: Icon(Icons.notifications, color: Colors.white,),
+          icon: Icon(Icons.notifications, color: Colors.white),
           onPressed: () async {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => FriendRequestScreen(
-                  currentUserId: widget.currentUserId,
-                ),
+                builder: (context) => FriendRequestScreen(currentUserId: widget.currentUserId),
               ),
             );
-            fetchFriends(); // 🔥 Reload danh sách bạn bè ngay sau khi quay lại
+            fetchFriends();
           },
         ),
       ],
@@ -126,7 +155,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
       padding: EdgeInsets.all(10),
       child: TextField(
         decoration: InputDecoration(
-          hintText: "Tìm kiếm bạn bè...",
+          hintText: "Tìm kiếm...",
           prefixIcon: Icon(Icons.search, color: Colors.grey),
           filled: true,
           fillColor: Colors.white,
@@ -139,46 +168,124 @@ class _FriendListScreenState extends State<FriendListScreen> {
     );
   }
 
-  // 🔥 **UI danh sách bạn bè giống Zalo**
-  Widget _buildFriendItem(Map<String, dynamic> friend) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          radius: 25,
-          backgroundColor: Colors.blue[300],
-          child: Icon(Icons.person, color: Colors.white),// 🖼 Ảnh avatar mặc định
+  // 🔥 **Danh sách bạn bè**
+  Widget _buildFriendList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          child: Text("Bạn bè", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
-        title: Text(
-          friend['username'],
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        isLoadingFriends
+            ? Center(child: CircularProgressIndicator())
+            : friends.isEmpty
+            ? Center(child: Text("Chưa có bạn bè", style: TextStyle(fontSize: 17)))
+            : Column(
+          children: friends.map((friend) {
+            bool isOnline = friend['online'] == 1;
+            return _buildFriendItem(friend, isOnline);
+          }).toList(),
         ),
-        subtitle: Text("Online", style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500),), // ✅ Giả lập trạng thái online
-        trailing: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blueAccent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+      ],
+    );
+  }
+
+  // 🔥 **Danh sách nhóm**
+  Widget _buildGroupList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          child: Text("Nhóm", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        isLoadingGroups
+            ? Center(child: CircularProgressIndicator())
+            : groups.isEmpty
+            ? Center(child: Text("Bạn chưa tham gia nhóm nào", style: TextStyle(fontSize: 17)))
+            : Column(
+          children: groups.map((group) => _buildGroupItem(group)).toList(),
+        ),
+      ],
+    );
+  }
+
+  // 🔥 **Nút tạo nhóm**
+  Widget _buildCreateGroupButton() {
+    return Padding(
+      padding: EdgeInsets.all(10),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CreateGroupScreen(currentUserId: widget.currentUserId),
             ),
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(
-                  currentUserId: widget.currentUserId,
-                  receiverId: friend['id'],
-                  receiverName: friend['username'],
-                ),
-              ),
-            );
-          },
-          child: Text("Nhắn tin", style: TextStyle(color: Colors.white)),
+          ).then((_) => fetchGroups());
+        },
+        icon: Icon(Icons.group_add, color: Colors.white),
+        label: Text("Tạo nhóm mới", style: TextStyle(color: Colors.white)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blueAccent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
+      ),
+    );
+  }
+
+  // 🔥 **UI danh sách bạn bè giống Zalo**
+  Widget _buildFriendItem(Map<String, dynamic> friend, bool isOnline) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: Colors.blue[300],
+        child: Icon(Icons.person, color: Colors.white),
+      ),
+      title: Text(friend['username'], style: TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(
+        isOnline ? "🟢 Đang hoạt động" : "⚪️ Ngoại tuyến",
+        style: TextStyle(color: isOnline ? Colors.green[500] : Colors.grey[700], fontSize:15),
+      ),
+      trailing: IconButton(
+        icon: Icon(Icons.chat, color: Colors.blueAccent),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                currentUserId: widget.currentUserId,
+                receiverId: friend['id'],
+                receiverName: friend['username'],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 🔥 **UI danh sách nhóm**
+  Widget _buildGroupItem(Map<String, dynamic> group) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: Colors.blue[300],
+        child: Icon(Icons.group, color: Colors.white),
+      ),
+      title: Text(group['name'], style: TextStyle(fontWeight: FontWeight.bold)),
+      trailing: IconButton(
+        icon: Icon(Icons.chat, color: Colors.blueAccent),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GroupChatScreen(
+                currentUserId: widget.currentUserId,
+                groupId: group['id'],
+                groupName: group['name'],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

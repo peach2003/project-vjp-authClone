@@ -1,31 +1,30 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart'; // 📌 Hiển thị giờ
-import '../../../service/api/chat_service.dart';
+import 'package:intl/intl.dart';
 
-class ChatScreen extends StatefulWidget {
+class GroupChatScreen extends StatefulWidget {
   final int currentUserId;
-  final int receiverId;
-  final String receiverName;
+  final int groupId;
+  final String groupName;
 
-  const ChatScreen({
+  const GroupChatScreen({
     Key? key,
     required this.currentUserId,
-    required this.receiverId,
-    required this.receiverName,
+    required this.groupId,
+    required this.groupName,
   }) : super(key: key);
 
   @override
-  _ChatScreenState createState() => _ChatScreenState();
+  _GroupChatScreenState createState() => _GroupChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
-  final ChatService _chatService = ChatService();
+class _GroupChatScreenState extends State<GroupChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final StreamController<List<Map<String, dynamic>>> _chatStreamController =
-  StreamController<List<Map<String, dynamic>>>.broadcast();
+      StreamController<List<Map<String, dynamic>>>.broadcast();
 
   Timer? _refreshTimer;
   List<Map<String, dynamic>> messages = [];
@@ -49,31 +48,38 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  // 🔹 Tự động refresh tin nhắn mỗi 2 giây
   void startAutoRefresh() {
-    _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _refreshTimer = Timer.periodic(Duration(seconds: 2), (timer) {
       fetchChatHistory();
     });
   }
 
+  // 🔹 Lấy lịch sử tin nhắn nhóm
   Future<void> fetchChatHistory() async {
-    List<Map<String, dynamic>> chatData = await _chatService.getChatHistory(
-      widget.currentUserId,
-      widget.receiverId,
-    );
-    if (mounted) {
-      setState(() {
-        messages = chatData;
-        messages = List<Map<String, dynamic>>.from(chatData).map((msg) {
-          // Chuyển đổi timestamp sang DateTime local trước khi lưu vào state
-          msg["created_at"] = DateTime.parse(msg["created_at"]).toLocal();
-          return msg;
-        }).toList();
-      });
-      _chatStreamController.add(messages);
-      _scrollToBottom();
+    try {
+      final response = await Dio().get(
+        "http://10.0.2.2:3000/group/messages/${widget.groupId}",
+      );
+
+      if (mounted) {
+        setState(() {
+          messages =
+              List<Map<String, dynamic>>.from(response.data).map((msg) {
+                // Chuyển đổi timestamp sang DateTime local trước khi lưu vào state
+                msg["created_at"] = DateTime.parse(msg["created_at"]).toLocal();
+                return msg;
+              }).toList();
+        });
+        _chatStreamController.add(messages);
+        _scrollToBottom();
+      }
+    } catch (e) {
+      print("❌ Lỗi khi lấy tin nhắn nhóm: $e");
     }
   }
 
+  // 🔹 Gửi tin nhắn nhóm
   Future<void> sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
@@ -82,9 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final newMessage = {
       "sender": widget.currentUserId,
-      "receiver": widget.receiverId,
       "message": messageText,
-      "message_type": "text",
       "created_at": DateTime.now().toIso8601String(),
     };
 
@@ -95,26 +99,25 @@ class _ChatScreenState extends State<ChatScreen> {
     _chatStreamController.add(messages);
     _scrollToBottom(force: true);
 
-    bool success = await _chatService.sendMessage(
-      widget.currentUserId,
-      widget.receiverId,
-      messageText,
-      "text",
-    );
-
-    if (!success) {
-      print("❌ Gửi tin nhắn thất bại");
+    try {
+      await Dio().post(
+        "http://10.0.2.2:3000/group/send-message",
+        data: {
+          "groupId": widget.groupId,
+          "sender": widget.currentUserId,
+          "message": messageText,
+        },
+      );
+    } catch (e) {
+      print("❌ Lỗi khi gửi tin nhắn: $e");
     }
   }
 
+  // 🔹 Cuộn xuống tin nhắn mới nhất
   void _scrollToBottom({bool force = false}) {
     Future.delayed(Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
-        if (force ||
-            _scrollController.position.pixels >=
-                _scrollController.position.maxScrollExtent - 100) {
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        }
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
   }
@@ -151,11 +154,19 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 🔹 Thanh AppBar Gradient giống Zalo
+  // 🔹 AppBar giống Zalo
   PreferredSizeWidget _buildCustomAppBar() {
     return AppBar(
       elevation: 0,
       systemOverlayStyle: SystemUiOverlayStyle.light,
+      title: Text(
+        widget.groupName,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -164,10 +175,6 @@ class _ChatScreenState extends State<ChatScreen> {
             end: Alignment.bottomRight,
           ),
         ),
-      ),
-      title: Text(
-        widget.receiverName,
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
       ),
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
@@ -181,12 +188,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 🔹 Tin nhắn tự mở rộng theo nội dung
+  // 🔹 Hiển thị tin nhắn
   Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
     // ✅ Chuyển created_at từ String sang DateTime local
-    DateTime messageTime = message["created_at"] is String
-        ? DateTime.parse(message["created_at"]).toLocal()
-        : message["created_at"];
+    DateTime messageTime =
+        message["created_at"] is String
+            ? DateTime.parse(message["created_at"]).toLocal()
+            : message["created_at"];
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: IntrinsicWidth(
@@ -214,19 +223,17 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Flexible(
-                child: Text(
-                  message["message"],
-                  style: TextStyle(fontSize: 16, color: Colors.black),
-                ),
+              Text(
+                message["message"],
+                style: TextStyle(fontSize: 16, color: Colors.black),
               ),
               SizedBox(height: 4),
               Align(
                 alignment: Alignment.bottomRight,
                 child: Text(
-                  DateFormat('HH:mm').format(messageTime), // ✅ Hiển thị giờ chính xác
+                  DateFormat('HH:mm').format(messageTime),
+                  // ✅ Hiển thị giờ chính xác
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ),
@@ -237,7 +244,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 🔹 Ô nhập tin nhắn động
+  // 🔹 Ô nhập tin nhắn
   Widget _buildMessageInput() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -247,7 +254,14 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
-          if (!isTyping) IconButton(icon: Icon(Icons.emoji_emotions_outlined, color: Colors.grey[700]), onPressed: () {}),
+          if (!isTyping)
+            IconButton(
+              icon: Icon(
+                Icons.emoji_emotions_outlined,
+                color: Colors.grey[700],
+              ),
+              onPressed: () {},
+            ),
           Expanded(
             child: TextField(
               controller: _messageController,
@@ -258,9 +272,18 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           if (!isTyping) ...[
-            IconButton(icon: Icon(Icons.more_horiz, color: Colors.grey[700]), onPressed: () {}),
-            IconButton(icon: Icon(Icons.mic, color: Colors.grey[700]), onPressed: () {}),
-            IconButton(icon: Icon(Icons.image, color: Colors.grey[700]), onPressed: () {}),
+            IconButton(
+              icon: Icon(Icons.more_horiz, color: Colors.grey[700]),
+              onPressed: () {},
+            ),
+            IconButton(
+              icon: Icon(Icons.mic, color: Colors.grey[700]),
+              onPressed: () {},
+            ),
+            IconButton(
+              icon: Icon(Icons.image, color: Colors.grey[700]),
+              onPressed: () {},
+            ),
           ] else
             FloatingActionButton(
               onPressed: sendMessage,

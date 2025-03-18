@@ -37,6 +37,7 @@ class AuthService {
 
       int? userId = response.data['userId']; // ✅ Đảm bảo API trả về userId hợp lệ
       String? role = response.data['role']; // ✅ Lấy role từ API
+      bool? online = response.data['online']; // ✅ Nhận trạng thái online từ server
       if (userId == null || userId == 0) {
         print("❌ Lỗi: API không trả về userId hợp lệ");
         return null;
@@ -47,6 +48,7 @@ class AuthService {
       await prefs.setString("token", response.data['token'] ?? "");
       await prefs.setString("username", username);
       await prefs.setString("role", response.data['role'] ?? "unknown");
+      await prefs.setBool("online", online ?? false); // ✅ Lưu trạng thái online
 
       print("✅ Đăng nhập thành công! User ID: $userId, Role: $role");
       return userId;
@@ -64,19 +66,20 @@ class AuthService {
   // 🔹 Đăng xuất
   Future<void> logout() async {
     try {
-      await _dio.post("/logout"); // Gửi request đến server (có thể không cần)
-
-      // Xóa dữ liệu đăng nhập khỏi SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.remove("token");
-      await prefs.remove("userId");
-      await prefs.remove("username");
-      await prefs.remove("role");
-      print("✅ Đăng xuất thành công!");
+      int? userId = prefs.getInt("userId");
+
+      if (userId != null) {
+        await _dio.post("/logout", data: { "userId": userId });
+      }
+
+      await prefs.clear(); // Xóa toàn bộ dữ liệu sau khi logout
+      print("✅ Đăng xuất thành công! User ID: $userId (online = false)");
     } catch (e) {
       print("❌ Lỗi đăng xuất: $e");
     }
   }
+
 
   // 🔹 Lấy danh sách user từ server
   Future<List<Map<String, dynamic>>> getUsers() async {
