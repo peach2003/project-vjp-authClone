@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
+import '../../../service/api/friend_service.dart';
 
 import 'add_friend_screen.dart';
 import 'chat_screen.dart';
@@ -13,13 +13,14 @@ class FriendListScreen extends StatefulWidget {
   final int currentUserId;
 
   const FriendListScreen({Key? key, required this.currentUserId})
-      : super(key: key);
+    : super(key: key);
 
   @override
   _FriendListScreenState createState() => _FriendListScreenState();
 }
 
 class _FriendListScreenState extends State<FriendListScreen> {
+  final FriendService _friendService = FriendService();
   List<Map<String, dynamic>> friends = [];
   List<Map<String, dynamic>> groups = [];
   bool isLoadingFriends = true;
@@ -35,7 +36,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
 
   // 🔹 Tự động refresh danh sách bạn bè & nhóm mỗi 3 giây
   void startAutoRefresh() {
-    Timer.periodic(Duration(seconds: 3), (timer) {
+    Timer.periodic(Duration(seconds: 1), (timer) {
       fetchFriends();
       fetchGroups();
     });
@@ -44,12 +45,10 @@ class _FriendListScreenState extends State<FriendListScreen> {
   // 🔹 Lấy danh sách bạn bè từ API
   Future<void> fetchFriends() async {
     try {
-      final response = await Dio().get(
-        "http://10.0.2.2:3000/friends/list/${widget.currentUserId}",
-      );
+      final friendsList = await _friendService.getFriends(widget.currentUserId);
       if (mounted) {
         setState(() {
-          friends = List<Map<String, dynamic>>.from(response.data);
+          friends = friendsList;
           isLoadingFriends = false;
         });
       }
@@ -62,17 +61,10 @@ class _FriendListScreenState extends State<FriendListScreen> {
   // 🔹 Lấy danh sách nhóm từ API
   Future<void> fetchGroups() async {
     try {
-      print("📤 Đang lấy danh sách nhóm từ server...");
-
-      final response = await Dio().get(
-        "http://10.0.2.2:3000/groups/list/${widget.currentUserId}",
-      );
-
-      print("✅ Response từ server: ${response.data}");
-
+      final groupsList = await _friendService.getGroups(widget.currentUserId);
       if (mounted) {
         setState(() {
-          groups = List<Map<String, dynamic>>.from(response.data);
+          groups = groupsList;
           isLoadingGroups = false;
         });
       }
@@ -127,7 +119,9 @@ class _FriendListScreenState extends State<FriendListScreen> {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AddFriendScreen(currentUserId: widget.currentUserId),
+                builder:
+                    (context) =>
+                        AddFriendScreen(currentUserId: widget.currentUserId),
               ),
             );
             fetchFriends();
@@ -139,7 +133,10 @@ class _FriendListScreenState extends State<FriendListScreen> {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => FriendRequestScreen(currentUserId: widget.currentUserId),
+                builder:
+                    (context) => FriendRequestScreen(
+                      currentUserId: widget.currentUserId,
+                    ),
               ),
             );
             fetchFriends();
@@ -175,18 +172,24 @@ class _FriendListScreenState extends State<FriendListScreen> {
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-          child: Text("Bạn bè", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          child: Text(
+            "Bạn bè",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
         isLoadingFriends
             ? Center(child: CircularProgressIndicator())
             : friends.isEmpty
-            ? Center(child: Text("Chưa có bạn bè", style: TextStyle(fontSize: 17)))
+            ? Center(
+              child: Text("Chưa có bạn bè", style: TextStyle(fontSize: 17)),
+            )
             : Column(
-          children: friends.map((friend) {
-            bool isOnline = friend['online'] == 1;
-            return _buildFriendItem(friend, isOnline);
-          }).toList(),
-        ),
+              children:
+                  friends.map((friend) {
+                    bool isOnline = friend['online'] == 1;
+                    return _buildFriendItem(friend, isOnline);
+                  }).toList(),
+            ),
       ],
     );
   }
@@ -198,15 +201,23 @@ class _FriendListScreenState extends State<FriendListScreen> {
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-          child: Text("Nhóm", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          child: Text(
+            "Nhóm",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
         isLoadingGroups
             ? Center(child: CircularProgressIndicator())
             : groups.isEmpty
-            ? Center(child: Text("Bạn chưa tham gia nhóm nào", style: TextStyle(fontSize: 17)))
+            ? Center(
+              child: Text(
+                "Bạn chưa tham gia nhóm nào",
+                style: TextStyle(fontSize: 17),
+              ),
+            )
             : Column(
-          children: groups.map((group) => _buildGroupItem(group)).toList(),
-        ),
+              children: groups.map((group) => _buildGroupItem(group)).toList(),
+            ),
       ],
     );
   }
@@ -220,7 +231,9 @@ class _FriendListScreenState extends State<FriendListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => CreateGroupScreen(currentUserId: widget.currentUserId),
+              builder:
+                  (context) =>
+                      CreateGroupScreen(currentUserId: widget.currentUserId),
             ),
           ).then((_) => fetchGroups());
         },
@@ -241,10 +254,16 @@ class _FriendListScreenState extends State<FriendListScreen> {
         backgroundColor: Colors.blue[300],
         child: Icon(Icons.person, color: Colors.white),
       ),
-      title: Text(friend['username'], style: TextStyle(fontWeight: FontWeight.bold)),
+      title: Text(
+        friend['username'],
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
       subtitle: Text(
         isOnline ? "🟢 Đang hoạt động" : "⚪️ Ngoại tuyến",
-        style: TextStyle(color: isOnline ? Colors.green[500] : Colors.grey[700], fontSize:15),
+        style: TextStyle(
+          color: isOnline ? Colors.green[500] : Colors.grey[700],
+          fontSize: 15,
+        ),
       ),
       trailing: IconButton(
         icon: Icon(Icons.chat, color: Colors.blueAccent),
@@ -252,11 +271,12 @@ class _FriendListScreenState extends State<FriendListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                currentUserId: widget.currentUserId,
-                receiverId: friend['id'],
-                receiverName: friend['username'],
-              ),
+              builder:
+                  (context) => ChatScreen(
+                    currentUserId: widget.currentUserId,
+                    receiverId: friend['id'],
+                    receiverName: friend['username'],
+                  ),
             ),
           );
         },
@@ -278,11 +298,12 @@ class _FriendListScreenState extends State<FriendListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => GroupChatScreen(
-                currentUserId: widget.currentUserId,
-                groupId: group['id'],
-                groupName: group['name'],
-              ),
+              builder:
+                  (context) => GroupChatScreen(
+                    currentUserId: widget.currentUserId,
+                    groupId: group['id'],
+                    groupName: group['name'],
+                  ),
             ),
           );
         },

@@ -1,13 +1,13 @@
 import 'package:dio/dio.dart';
 
 class FriendService {
-  final Dio _dio = Dio();
-  final String baseUrl = "http://10.0.2.2:3000";
+  final Dio _dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3000"));
 
-  // Lấy danh sách bạn bè
+  // 🔹 Lấy danh sách bạn bè
   Future<List<Map<String, dynamic>>> getFriends(int userId) async {
     try {
-      final response = await _dio.get('$baseUrl/friends/list/$userId');
+      final response = await _dio.get("/friends/list/$userId");
+      print("✅ Response từ server: ${response.data}");
       return List<Map<String, dynamic>>.from(response.data);
     } catch (e) {
       print("❌ Lỗi khi lấy danh sách bạn bè: $e");
@@ -15,10 +15,12 @@ class FriendService {
     }
   }
 
-  // Lấy danh sách nhóm của user
+  // 🔹 Lấy danh sách nhóm của user
   Future<List<Map<String, dynamic>>> getGroups(int userId) async {
     try {
-      final response = await _dio.get('$baseUrl/groups/list/$userId');
+      print("📤 Đang lấy danh sách nhóm từ server...");
+      final response = await _dio.get("/groups/list/$userId");
+      print("✅ Response từ server: ${response.data}");
       return List<Map<String, dynamic>>.from(response.data);
     } catch (e) {
       print("❌ Lỗi khi lấy danh sách nhóm: $e");
@@ -26,10 +28,10 @@ class FriendService {
     }
   }
 
-  // Lấy danh sách user chưa là bạn bè
+  // 🔹 Lấy danh sách user chưa là bạn bè
   Future<List<Map<String, dynamic>>> getUsersNotFriends(int userId) async {
     try {
-      final response = await _dio.get('$baseUrl/users/not-friends/$userId');
+      final response = await _dio.get("/users/all/$userId");
       return List<Map<String, dynamic>>.from(response.data);
     } catch (e) {
       print("❌ Lỗi khi lấy danh sách user chưa là bạn bè: $e");
@@ -37,22 +39,24 @@ class FriendService {
     }
   }
 
-  // Gửi lời mời kết bạn
-  Future<void> sendFriendRequest(int fromUser, int toUser) async {
+  // 🔹 Gửi lời mời kết bạn
+  Future<bool> sendFriendRequest(int fromUser, int toUser) async {
     try {
       await _dio.post(
-        "$baseUrl/friends/request",
+        "/friends/request",
         data: {"fromUser": fromUser, "toUser": toUser},
       );
+      return true;
     } catch (e) {
       print("❌ Lỗi khi gửi lời mời kết bạn: $e");
+      return false;
     }
   }
 
-  // Lấy danh sách lời mời kết bạn đang chờ xử lý
+  // 🔹 Lấy danh sách lời mời kết bạn đang chờ xử lý
   Future<List<Map<String, dynamic>>> getPendingRequests(int userId) async {
     try {
-      final response = await _dio.get('$baseUrl/friends/pending/$userId');
+      final response = await _dio.get("/friends/pending/$userId");
       return List<Map<String, dynamic>>.from(response.data);
     } catch (e) {
       print("❌ Lỗi khi lấy danh sách lời mời kết bạn: $e");
@@ -60,12 +64,12 @@ class FriendService {
     }
   }
 
-  // Chấp nhận lời mời kết bạn
+  // 🔹 Chấp nhận lời mời kết bạn
   Future<bool> acceptFriendRequest(int fromUser, int toUser) async {
     try {
       await _dio.post(
-        '$baseUrl/friends/accept',
-        data: {'fromUser': fromUser, 'toUser': toUser},
+        "/friends/accept",
+        data: {"fromUser": fromUser, "toUser": toUser},
       );
       return true;
     } catch (e) {
@@ -74,12 +78,12 @@ class FriendService {
     }
   }
 
-  // Từ chối lời mời kết bạn
+  // 🔹 Từ chối lời mời kết bạn
   Future<bool> rejectFriendRequest(int fromUser, int toUser) async {
     try {
       await _dio.post(
-        '$baseUrl/friends/reject',
-        data: {'fromUser': fromUser, 'toUser': toUser},
+        "/friends/reject",
+        data: {"fromUser": fromUser, "toUser": toUser},
       );
       return true;
     } catch (e) {

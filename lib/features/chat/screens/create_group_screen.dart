@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
+import '../../../service/api/group_service.dart';
+import '../../../service/api/friend_service.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final int currentUserId;
@@ -13,6 +14,8 @@ class CreateGroupScreen extends StatefulWidget {
 }
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
+  final GroupService _groupService = GroupService();
+  final FriendService _friendService = FriendService();
   final TextEditingController _groupNameController = TextEditingController();
   List<Map<String, dynamic>> friends = [];
   List<int> selectedFriends = [];
@@ -26,11 +29,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   // 🔹 Gọi API lấy danh sách bạn bè
   Future<void> fetchFriends() async {
     try {
-      final response = await Dio().get(
-        "http://10.0.2.2:3000/friends/list/${widget.currentUserId}",
-      );
+      final friendsList = await _friendService.getFriends(widget.currentUserId);
       setState(() {
-        friends = List<Map<String, dynamic>>.from(response.data);
+        friends = friendsList;
       });
     } catch (e) {
       print("❌ Lỗi khi lấy danh sách bạn bè: $e");
@@ -112,26 +113,21 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     }
 
     try {
-      final response = await Dio().post(
-        "http://10.0.2.2:3000/group/create",
-        data: {
-          "name": _groupNameController.text,
-          "creatorId": widget.currentUserId,
-          "members": selectedFriends,
-        },
+      final groupId = await _groupService.createGroup(
+        _groupNameController.text,
+        selectedFriends,
+        widget.currentUserId,
       );
 
-      if (response.statusCode == 200) {
+      if (groupId != null) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("Nhóm đã được tạo!")));
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Lỗi khi tạo nhóm: ${response.data['error']}"),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Lỗi khi tạo nhóm")));
       }
     } catch (e) {
       print("❌ Lỗi khi tạo nhóm: $e");
@@ -157,7 +153,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             ),
           ),
         ),
-        title: Text("Tạo nhóm mới", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),),
+        title: Text(
+          "Tạo nhóm mới",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
           icon: Icon(Icons.arrow_back_ios, color: Colors.white),

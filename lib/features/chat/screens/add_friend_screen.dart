@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../service/api/friend_service.dart';
 
 class AddFriendScreen extends StatefulWidget {
   final int currentUserId;
@@ -12,6 +12,7 @@ class AddFriendScreen extends StatefulWidget {
 }
 
 class _AddFriendScreenState extends State<AddFriendScreen> {
+  final FriendService _friendService = FriendService();
   List<Map<String, dynamic>> users = [];
   Set<int> sentRequests = {}; // Lưu trạng thái gửi lời mời kết bạn
   bool isLoading = true;
@@ -25,9 +26,9 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
   // 🔹 Lấy danh sách user (trừ user đang đăng nhập)
   Future<void> fetchUsers() async {
     try {
-      final response = await Dio().get("http://10.0.2.2:3000/users/all/${widget.currentUserId}");
+      final usersList = await _friendService.getUsersNotFriends(widget.currentUserId);
       setState(() {
-        users = List<Map<String, dynamic>>.from(response.data);
+        users = usersList;
         isLoading = false;
       });
     } catch (e) {
@@ -49,18 +50,21 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
 
       print("🔹 Đang gửi lời mời từ $currentUserId đến $friendId");
 
-      await Dio().post("http://10.0.2.2:3000/friends/request", data: {
-        "fromUser": currentUserId,
-        "toUser": friendId,
-      });
+      final success = await _friendService.sendFriendRequest(currentUserId, friendId);
 
-      setState(() {
-        sentRequests.add(friendId); // Cập nhật trạng thái gửi thành công
-      });
+      if (success) {
+        setState(() {
+          sentRequests.add(friendId); // Cập nhật trạng thái gửi thành công
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Đã gửi lời mời kết bạn!")),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Đã gửi lời mời kết bạn!")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Không thể gửi lời mời kết bạn")),
+        );
+      }
     } catch (e) {
       print("❌ Lỗi khi gửi lời mời kết bạn: $e");
       ScaffoldMessenger.of(context).showSnackBar(

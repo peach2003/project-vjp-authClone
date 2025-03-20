@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../../../service/api/group_service.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final int currentUserId;
@@ -21,6 +21,7 @@ class GroupChatScreen extends StatefulWidget {
 }
 
 class _GroupChatScreenState extends State<GroupChatScreen> {
+  final GroupService _groupService = GroupService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final StreamController<List<Map<String, dynamic>>> _chatStreamController =
@@ -42,15 +43,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       });
     });
 
-    // 🔥 Cuộn xuống tin nhắn mới nhất khi mở màn hình chat
+    // Cuộn xuống tin nhắn mới nhất khi mở màn hình chat
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom(force: true);
     });
   }
 
-  // 🔹 Tự động refresh tin nhắn mỗi 2 giây
+  // 🔹 Tự động refresh tin nhắn mỗi 1 giây
   void startAutoRefresh() {
-    _refreshTimer = Timer.periodic(Duration(seconds: 2), (timer) {
+    _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       fetchChatHistory();
     });
   }
@@ -58,18 +59,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   // 🔹 Lấy lịch sử tin nhắn nhóm
   Future<void> fetchChatHistory() async {
     try {
-      final response = await Dio().get(
-        "http://10.0.2.2:3000/group/messages/${widget.groupId}",
-      );
+      final messagesList = await _groupService.getGroupMessages(widget.groupId);
 
       if (mounted) {
         setState(() {
-          messages =
-              List<Map<String, dynamic>>.from(response.data).map((msg) {
-                // Chuyển đổi timestamp sang DateTime local trước khi lưu vào state
-                msg["created_at"] = DateTime.parse(msg["created_at"]).toLocal();
-                return msg;
-              }).toList();
+          messages = messagesList.map((msg) {
+            // Chuyển đổi timestamp sang DateTime local trước khi lưu vào state
+            msg["created_at"] = DateTime.parse(msg["created_at"]).toLocal();
+            return msg;
+          }).toList();
         });
         _chatStreamController.add(messages);
         _scrollToBottom();
@@ -100,14 +98,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _scrollToBottom(force: true);
 
     try {
-      await Dio().post(
-        "http://10.0.2.2:3000/group/send-message",
-        data: {
-          "groupId": widget.groupId,
-          "sender": widget.currentUserId,
-          "message": messageText,
-        },
+      bool success = await _groupService.sendGroupMessage(
+        widget.groupId,
+        widget.currentUserId,
+        messageText,
       );
+
+      if (!success) {
+        print("❌ Lỗi khi gửi tin nhắn nhóm");
+      }
     } catch (e) {
       print("❌ Lỗi khi gửi tin nhắn: $e");
     }
@@ -181,9 +180,18 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         icon: Icon(Icons.arrow_back_ios, color: Colors.white),
       ),
       actions: [
-        IconButton(icon: Icon(Icons.phone, color: Colors.white), onPressed: () {}),
-        IconButton(icon: Icon(Icons.video_call, color: Colors.white), onPressed: () {}),
-        IconButton(icon: Icon(Icons.menu, color: Colors.white), onPressed: () {}),
+        IconButton(
+          icon: Icon(Icons.phone, color: Colors.white),
+          onPressed: () {},
+        ),
+        IconButton(
+          icon: Icon(Icons.video_call, color: Colors.white),
+          onPressed: () {},
+        ),
+        IconButton(
+          icon: Icon(Icons.menu, color: Colors.white),
+          onPressed: () {},
+        ),
       ],
     );
   }

@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
+import '../../../service/api/friend_service.dart';
 
 class FriendRequestScreen extends StatefulWidget {
   final int currentUserId;
-  const FriendRequestScreen({Key? key, required this.currentUserId}) : super(key: key);
+  const FriendRequestScreen({Key? key, required this.currentUserId})
+    : super(key: key);
 
   @override
   _FriendRequestScreenState createState() => _FriendRequestScreenState();
 }
 
 class _FriendRequestScreenState extends State<FriendRequestScreen> {
+  final FriendService _friendService = FriendService();
   List<Map<String, dynamic>> friendRequests = [];
   bool isLoading = true;
 
@@ -23,10 +25,11 @@ class _FriendRequestScreenState extends State<FriendRequestScreen> {
   // 🔹 Lấy danh sách lời mời kết bạn từ server
   Future<void> fetchFriendRequests() async {
     try {
-      final response = await Dio().get(
-          "http://10.0.2.2:3000/friends/pending/${widget.currentUserId}");
+      final requests = await _friendService.getPendingRequests(
+        widget.currentUserId,
+      );
       setState(() {
-        friendRequests = List<Map<String, dynamic>>.from(response.data);
+        friendRequests = requests;
         isLoading = false;
       });
     } catch (e) {
@@ -38,46 +41,58 @@ class _FriendRequestScreenState extends State<FriendRequestScreen> {
   // 🔹 Xử lý chấp nhận lời mời
   Future<void> acceptRequest(int friendId) async {
     try {
-      await Dio().post("http://10.0.2.2:3000/friends/accept", data: {
-        "fromUser": friendId,
-        "toUser": widget.currentUserId,
-      });
-
-      setState(() {
-        friendRequests.removeWhere((user) => user['id'] == friendId);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Đã chấp nhận kết bạn!")),
+      bool success = await _friendService.acceptFriendRequest(
+        friendId,
+        widget.currentUserId,
       );
+
+      if (success) {
+        setState(() {
+          friendRequests.removeWhere((user) => user['id'] == friendId);
+        });
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Đã chấp nhận kết bạn!")));
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Lỗi khi chấp nhận kết bạn")));
+      }
     } catch (e) {
       print("❌ Lỗi khi chấp nhận lời mời kết bạn: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Lỗi khi chấp nhận kết bạn")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Lỗi khi chấp nhận kết bạn")));
     }
   }
 
   // 🔹 Xử lý từ chối lời mời
   Future<void> rejectRequest(int friendId) async {
     try {
-      await Dio().post("http://10.0.2.2:3000/friends/reject", data: {
-        "fromUser": friendId,
-        "toUser": widget.currentUserId,
-      });
-
-      setState(() {
-        friendRequests.removeWhere((user) => user['id'] == friendId);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Đã từ chối kết bạn!")),
+      bool success = await _friendService.rejectFriendRequest(
+        friendId,
+        widget.currentUserId,
       );
+
+      if (success) {
+        setState(() {
+          friendRequests.removeWhere((user) => user['id'] == friendId);
+        });
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Đã từ chối kết bạn!")));
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Lỗi khi từ chối kết bạn")));
+      }
     } catch (e) {
       print("❌ Lỗi khi từ chối lời mời kết bạn: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Lỗi khi từ chối kết bạn")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Lỗi khi từ chối kết bạn")));
     }
   }
 
@@ -86,25 +101,30 @@ class _FriendRequestScreenState extends State<FriendRequestScreen> {
     return Scaffold(
       appBar: _buildZaloAppBar(),
       backgroundColor: Color(0xFFF3F3F3), // ✅ Màu nền xám giống Zalo
-      body: isLoading
-          ? Center(child: CircularProgressIndicator()) // 🔄 Loading
-          : friendRequests.isEmpty
-          ? Center(child: Text(
-        "Không có lời mời kết bạn", style: TextStyle(fontSize: 17),))
-          : ListView.builder(
-        itemCount: friendRequests.length,
-        itemBuilder: (context, index) {
-          final user = friendRequests[index];
-          return _buildFriendRequestItem(user);
-        },
-      ),
+      body:
+          isLoading
+              ? Center(child: CircularProgressIndicator()) // 🔄 Loading
+              : friendRequests.isEmpty
+              ? Center(
+                child: Text(
+                  "Không có lời mời kết bạn",
+                  style: TextStyle(fontSize: 17),
+                ),
+              )
+              : ListView.builder(
+                itemCount: friendRequests.length,
+                itemBuilder: (context, index) {
+                  final user = friendRequests[index];
+                  return _buildFriendRequestItem(user);
+                },
+              ),
     );
   }
 
   // 🔥 **AppBar giống Zalo**
   AppBar _buildZaloAppBar() {
     return AppBar(
-      title: Text("Lời mời kết bạn", style: TextStyle(color: Colors.white),),
+      title: Text("Lời mời kết bạn", style: TextStyle(color: Colors.white)),
       centerTitle: true,
       elevation: 0,
       systemOverlayStyle: SystemUiOverlayStyle.light,
@@ -138,11 +158,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 3,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 2)),
         ],
       ),
       child: Row(
@@ -162,10 +178,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen> {
               children: [
                 Text(
                   user['username'],
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 4),
                 Text(
