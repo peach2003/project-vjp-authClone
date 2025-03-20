@@ -3,171 +3,177 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/bloc/auth_event.dart';
 import '../../auth/bloc/auth_state.dart';
-import '../bloc/language_bloc.dart';
-import '../bloc/language_event.dart';
-import '../bloc/language_state.dart';
 import '../widgets/company_list.dart';
-import '../widgets/language_selector.dart';
 import '../widgets/expert_carousel.dart';
+import '../bloc/home_bloc.dart';
+import '../bloc/home_event.dart';
+import '../bloc/home_state.dart';
 
 class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return BlocProvider(
+      create: (context) => HomeBloc()..add(LoadHomeData()),
+      child: _HomeContent(),
+    );
+  }
+}
 
-      // 🔹 AppBar chỉ chứa LanguageSelector căn phải
-      appBar: AppBar(
-        backgroundColor: Color.fromARGB(255, 251, 215, 64),
-        elevation: 0,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Image.asset(
-              'assets/images/logo.png',
-              width: 120,
-              height: 60,
-              fit: BoxFit.cover,
-            ),
-            LanguageSelector(),
-          ],
+class _HomeContent extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<HomeBloc, HomeState>(
+      builder: (context, state) {
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: _buildAppBar(),
+          body: _buildBody(context, state),
+        );
+      },
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Color.fromARGB(255, 251, 215, 64),
+      elevation: 0,
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Image.asset(
+            'assets/images/logo.png',
+            width: 120,
+            height: 60,
+            fit: BoxFit.cover,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, HomeState state) {
+    if (state is HomeLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+
+    if (state is HomeError) {
+      return Center(child: Text(state.message));
+    }
+
+    return SingleChildScrollView(
+      physics: ClampingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildBanner(),
+          SizedBox(height: 20),
+          _buildSearchButton(context),
+          SizedBox(height: 20),
+          _buildFeaturedCompaniesSection(),
+          SizedBox(height: 10),
+          _buildExpertsSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBanner() {
+    return Image.network(
+      'https://vjp-connect.com/_next/static/media/vjp-connect-banner-sm.eed45626.webp',
+      width: double.infinity,
+      fit: BoxFit.cover,
+      height: 200,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          height: 200,
+          color: Colors.grey[300],
+          child: Center(child: Text("Không tìm thấy ảnh banner")),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchButton(BuildContext context) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      ),
+      onPressed: () {
+        context.read<HomeBloc>().add(SearchCompanies(""));
+      },
+      child: Text(
+        "Tìm doanh nghiệp",
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
         ),
       ),
-      body: SingleChildScrollView(
-        physics: ClampingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 🔹 Banner chính (hiển thị dưới Logo + Nút Đăng Nhập)
-            Image.network(
-              'https://vjp-connect.com/_next/static/media/vjp-connect-banner-sm.eed45626.webp',
-              width: double.infinity,
-              fit: BoxFit.cover,
-              height: 200,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 200,
-                  color: Colors.grey[300],
-                  child: Center(child: Text("Không tìm thấy ảnh banner")),
-                );
-              },
-            ),
+    );
+  }
 
-            SizedBox(height: 20),
+  Widget _buildFeaturedCompaniesSection() {
+    return Column(
+      children: [
+        Text(
+          "NHỮNG CÔNG TY NỔI BẬT",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        SizedBox(height: 10),
+        Padding(padding: const EdgeInsets.all(16.0), child: CompanyList()),
+      ],
+    );
+  }
 
-            // 🔹 Chọn quốc gia
-            BlocBuilder<LanguageBloc, LanguageState>(
-              builder: (context, state) {
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ChoiceChip(
-                      label: Text("🇻🇳 Việt Nam", style: TextStyle(fontSize: 18)),
-                      selected: state.languageCode == "VN",
-                      onSelected: (selected) {
-                        context.read<LanguageBloc>().add(ChangeLanguage("VN"));
-                      },
-                    ),
-                    SizedBox(width: 10),
-                    ChoiceChip(
-                      label: Text("🇯🇵 Nhật Bản", style: TextStyle(fontSize: 18)),
-                      selected: state.languageCode == "JP",
-                      onSelected: (selected) {
-                        context.read<LanguageBloc>().add(ChangeLanguage("JP"));
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-            SizedBox(height: 10),
+  Widget _buildExpertsSection() {
+    return Column(
+      children: [
+        Text(
+          "CÁC CHUYÊN GIA HỖ TRỢ",
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        SizedBox(height: 10),
+        _buildExpertTitle(),
+        SizedBox(height: 10),
+        ExpertCarousel(),
+      ],
+    );
+  }
 
-            // 🔹 Nút "Tìm doanh nghiệp"
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              onPressed: () {
-                print("Tìm doanh nghiệp!");
-              },
-              child: Text(
-                "Tìm doanh nghiệp",
+  Widget _buildExpertTitle() {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Colors.blue, thickness: 1, indent: 70)),
+        SizedBox(width: 10),
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: "CHUYÊN GIA ĐẠI DIỆN",
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
+                  color: Colors.blue,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-
-            SizedBox(height: 20),
-
-            // 🔹 Tiêu đề "NHỮNG CÔNG TY NỔI BẬT"
-            Text(
-              "NHỮNG CÔNG TY NỔI BẬT",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-
-            SizedBox(height: 10),
-
-            // 🔹 Danh sách công ty nổi bật
-            Padding(padding: const EdgeInsets.all(16.0), child: CompanyList()),
-
-            SizedBox(height: 10),
-
-            // 🔹 Tiêu đề "CÁC CHUYÊN GIA HỖ TRỢ"
-            Text(
-              "CÁC CHUYÊN GIA HỖ TRỢ",
-              style: TextStyle(
-                fontSize: 25,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            SizedBox(height: 10),
-
-            // 🔹 Tiêu đề "CHUYÊN GIA ĐẠI DIỆN"
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(color: Colors.blue, thickness: 1, indent: 70),
-              ),
-              SizedBox(width: 10),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "CHUYÊN GIA ĐẠI DIỆN",
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    
-                  ],
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: Divider(color: Colors.blue, thickness: 1, endIndent: 70),
-              ),
             ],
           ),
-
-            SizedBox(height: 10),
-            ExpertCarousel(),
-          ],
         ),
-      ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Divider(color: Colors.blue, thickness: 1, endIndent: 70),
+        ),
+      ],
     );
   }
 }

@@ -6,7 +6,6 @@ import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/bloc/auth_event.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
-import 'features/home/bloc/language_bloc.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/navbar/bottom_navbar.dart';
 import 'firebase_options.dart';
@@ -19,7 +18,6 @@ void main() async {
   runApp(
     MultiBlocProvider(
       providers: [
-        BlocProvider(create: (context) => LanguageBloc()),
         BlocProvider(
           create: (context) => AuthBloc(AuthService())..add(CheckLoginStatusEvent()),
         ), // Kiểm tra đăng nhập

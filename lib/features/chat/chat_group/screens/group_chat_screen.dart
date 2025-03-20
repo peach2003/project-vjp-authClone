@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../../service/api/group_service.dart';
+import '../bloc/group_chat_bloc.dart';
+import '../bloc/group_chat_event.dart';
+import '../bloc/group_chat_state.dart';
 
-class GroupChatScreen extends StatefulWidget {
+class GroupChatScreen extends StatelessWidget {
   final int currentUserId;
   final int groupId;
   final String groupName;
@@ -17,106 +20,75 @@ class GroupChatScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _GroupChatScreenState createState() => _GroupChatScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => GroupChatBloc()..add(FetchGroupMessages(groupId)),
+      child: _GroupChatContent(
+        currentUserId: currentUserId,
+        groupId: groupId,
+        groupName: groupName,
+      ),
+    );
+  }
 }
 
-class _GroupChatScreenState extends State<GroupChatScreen> {
-  final GroupService _groupService = GroupService();
+class _GroupChatContent extends StatefulWidget {
+  final int currentUserId;
+  final int groupId;
+  final String groupName;
+
+  const _GroupChatContent({
+    Key? key,
+    required this.currentUserId,
+    required this.groupId,
+    required this.groupName,
+  }) : super(key: key);
+
+  @override
+  _GroupChatContentState createState() => _GroupChatContentState();
+}
+
+class _GroupChatContentState extends State<_GroupChatContent> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final StreamController<List<Map<String, dynamic>>> _chatStreamController =
-      StreamController<List<Map<String, dynamic>>>.broadcast();
-
+  bool isTyping = false;
   Timer? _refreshTimer;
-  List<Map<String, dynamic>> messages = [];
-  bool isTyping = false; // Trạng thái nhập tin nhắn
 
   @override
   void initState() {
     super.initState();
-    fetchChatHistory();
-    startAutoRefresh();
-    // 🔹 Lắng nghe nhập liệu để ẩn/hiện icon
+
     _messageController.addListener(() {
       setState(() {
         isTyping = _messageController.text.trim().isNotEmpty;
       });
     });
 
-    // Cuộn xuống tin nhắn mới nhất khi mở màn hình chat
+    startAutoRefresh();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom(force: true);
     });
   }
 
-  // 🔹 Tự động refresh tin nhắn mỗi 1 giây
   void startAutoRefresh() {
     _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      fetchChatHistory();
-    });
-  }
-
-  // 🔹 Lấy lịch sử tin nhắn nhóm
-  Future<void> fetchChatHistory() async {
-    try {
-      final messagesList = await _groupService.getGroupMessages(widget.groupId);
-
       if (mounted) {
-        setState(() {
-          messages = messagesList.map((msg) {
-            // Chuyển đổi timestamp sang DateTime local trước khi lưu vào state
-            msg["created_at"] = DateTime.parse(msg["created_at"]).toLocal();
-            return msg;
-          }).toList();
-        });
-        _chatStreamController.add(messages);
-        _scrollToBottom();
+        context.read<GroupChatBloc>().add(AutoRefresh(widget.groupId));
       }
-    } catch (e) {
-      print("❌ Lỗi khi lấy tin nhắn nhóm: $e");
-    }
-  }
-
-  // 🔹 Gửi tin nhắn nhóm
-  Future<void> sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
-
-    final messageText = _messageController.text.trim();
-    _messageController.clear();
-
-    final newMessage = {
-      "sender": widget.currentUserId,
-      "message": messageText,
-      "created_at": DateTime.now().toIso8601String(),
-    };
-
-    setState(() {
-      messages.add(newMessage);
     });
-
-    _chatStreamController.add(messages);
-    _scrollToBottom(force: true);
-
-    try {
-      bool success = await _groupService.sendGroupMessage(
-        widget.groupId,
-        widget.currentUserId,
-        messageText,
-      );
-
-      if (!success) {
-        print("❌ Lỗi khi gửi tin nhắn nhóm");
-      }
-    } catch (e) {
-      print("❌ Lỗi khi gửi tin nhắn: $e");
-    }
   }
 
-  // 🔹 Cuộn xuống tin nhắn mới nhất
   void _scrollToBottom({bool force = false}) {
+    if (!_scrollController.hasClients) return;
+
     Future.delayed(Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -124,9 +96,27 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
-    _chatStreamController.close();
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _sendMessage() {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) return;
+
+    _messageController.clear();
+    setState(() {
+      isTyping = false;
+    });
+
+    context.read<GroupChatBloc>().add(
+      SendGroupMessage(
+        groupId: widget.groupId,
+        senderId: widget.currentUserId,
+        message: message,
+      ),
+    );
   }
 
   @override
@@ -137,13 +127,60 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final message = messages[index];
-                bool isMe = message["sender"] == widget.currentUserId;
-                return _buildMessageBubble(message, isMe);
+            child: BlocConsumer<GroupChatBloc, GroupChatState>(
+              listenWhen: (previous, current) {
+                if (previous is GroupChatLoaded && current is GroupChatLoaded) {
+                  return previous.hasNewMessages(current);
+                }
+                return true;
+              },
+              listener: (context, state) {
+                if (state is GroupChatLoaded) {
+                  _scrollToBottom();
+                } else if (state is GroupChatMessageSent) {
+                  context.read<GroupChatBloc>().add(
+                    FetchGroupMessages(widget.groupId),
+                  );
+                } else if (state is GroupChatError) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(state.message)));
+                }
+              },
+              buildWhen: (previous, current) {
+                if (previous is GroupChatLoaded && current is GroupChatLoaded) {
+                  return previous.hasNewMessages(current);
+                }
+                return true;
+              },
+              builder: (context, state) {
+                if (state is GroupChatInitial ||
+                    (state is GroupChatLoading && state is! GroupChatLoaded)) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                if (state is GroupChatLoaded) {
+                  if (state.messages.isEmpty) {
+                    return Center(child: Text('Chưa có tin nhắn nào'));
+                  }
+
+                  return ListView.builder(
+                    key: PageStorageKey('chat_messages'),
+                    controller: _scrollController,
+                    itemCount: state.messages.length,
+                    itemBuilder: (context, index) {
+                      final message = state.messages[index];
+                      bool isMe = message["sender"] == widget.currentUserId;
+                      return _buildMessageBubble(message, isMe);
+                    },
+                  );
+                }
+
+                if (state is GroupChatError) {
+                  return Center(child: Text('Đã xảy ra lỗi: ${state.message}'));
+                }
+
+                return Container();
               },
             ),
           ),
@@ -153,7 +190,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
-  // 🔹 AppBar giống Zalo
   PreferredSizeWidget _buildCustomAppBar() {
     return AppBar(
       elevation: 0,
@@ -196,9 +232,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
-  // 🔹 Hiển thị tin nhắn
   Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
-    // ✅ Chuyển created_at từ String sang DateTime local
     DateTime messageTime =
         message["created_at"] is String
             ? DateTime.parse(message["created_at"]).toLocal()
@@ -232,6 +266,17 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (!isMe) ...[
+                Text(
+                  message["username"] ?? "Unknown",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+              ],
               Text(
                 message["message"],
                 style: TextStyle(fontSize: 16, color: Colors.black),
@@ -241,7 +286,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 alignment: Alignment.bottomRight,
                 child: Text(
                   DateFormat('HH:mm').format(messageTime),
-                  // ✅ Hiển thị giờ chính xác
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ),
@@ -252,7 +296,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
-  // 🔹 Ô nhập tin nhắn
   Widget _buildMessageInput() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -277,6 +320,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 hintText: "Tin nhắn",
                 border: InputBorder.none,
               ),
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendMessage(),
             ),
           ),
           if (!isTyping) ...[
@@ -294,7 +339,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             ),
           ] else
             FloatingActionButton(
-              onPressed: sendMessage,
+              onPressed: _sendMessage,
               mini: true,
               backgroundColor: Colors.blueAccent,
               child: Icon(Icons.send, color: Colors.white, size: 20),

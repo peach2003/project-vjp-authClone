@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import '../chat/screens/friend_list_screen.dart';
+import '../chat/friend_list/screens/friend_list_screen.dart';
 import '../home/screens/home_screen.dart';
 import '../person/person_screen.dart';
 

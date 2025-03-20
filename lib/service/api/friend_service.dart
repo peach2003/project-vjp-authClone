@@ -65,12 +65,20 @@ class FriendService {
   }
 
   // 🔹 Chấp nhận lời mời kết bạn
-  Future<bool> acceptFriendRequest(int fromUser, int toUser) async {
+  Future<bool> acceptFriendRequest(int currentUserId, int friendId) async {
     try {
-      await _dio.post(
+      print("📤 Đang gửi yêu cầu chấp nhận kết bạn...");
+      print("Data gửi đi: fromUser=$friendId, toUser=$currentUserId");
+      
+      final response = await _dio.post(
         "/friends/accept",
-        data: {"fromUser": fromUser, "toUser": toUser},
+        data: {
+          "fromUser": friendId,  // người gửi lời mời
+          "toUser": currentUserId // người nhận lời mời (người đang đăng nhập)
+        },
       );
+      
+      print("✅ Response từ server: ${response.data}");
       return true;
     } catch (e) {
       print("❌ Lỗi khi chấp nhận lời mời kết bạn: $e");
@@ -79,12 +87,20 @@ class FriendService {
   }
 
   // 🔹 Từ chối lời mời kết bạn
-  Future<bool> rejectFriendRequest(int fromUser, int toUser) async {
+  Future<bool> rejectFriendRequest(int currentUserId, int friendId) async {
     try {
-      await _dio.post(
+      print("📤 Đang gửi yêu cầu từ chối kết bạn...");
+      print("Data gửi đi: fromUser=$friendId, toUser=$currentUserId");
+      
+      final response = await _dio.post(
         "/friends/reject",
-        data: {"fromUser": fromUser, "toUser": toUser},
+        data: {
+          "fromUser": friendId,  // người gửi lời mời
+          "toUser": currentUserId // người nhận lời mời (người đang đăng nhập)
+        },
       );
+      
+      print("✅ Response từ server: ${response.data}");
       return true;
     } catch (e) {
       print("❌ Lỗi khi từ chối lời mời kết bạn: $e");

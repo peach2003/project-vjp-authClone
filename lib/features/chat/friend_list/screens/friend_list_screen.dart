@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../service/api/friend_service.dart';
-
-import 'add_friend_screen.dart';
-import 'chat_screen.dart';
-import 'create_group_screen.dart';
-import 'friend_request_screen.dart';
-import 'group_chat_screen.dart';
+import '../../../../service/api/friend_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/friend_list_bloc.dart';
+import '../bloc/friend_list_event.dart';
+import '../bloc/friend_list_state.dart';
+import '../../friend_add/screens/add_friend_screen.dart';
+import '../../chat_private/screens/chat_screen.dart';
+import '../../create_group/screens/create_group_screen.dart';
+import '../../friend_request/screens/friend_request_screen.dart';
+import '../../chat_group/screens/group_chat_screen.dart';
 
 class FriendListScreen extends StatefulWidget {
   final int currentUserId;
@@ -20,78 +23,50 @@ class FriendListScreen extends StatefulWidget {
 }
 
 class _FriendListScreenState extends State<FriendListScreen> {
-  final FriendService _friendService = FriendService();
-  List<Map<String, dynamic>> friends = [];
-  List<Map<String, dynamic>> groups = [];
-  bool isLoadingFriends = true;
-  bool isLoadingGroups = true;
-
-  @override
-  void initState() {
-    super.initState();
-    fetchFriends();
-    fetchGroups();
-    startAutoRefresh();
-  }
-
-  // 🔹 Tự động refresh danh sách bạn bè & nhóm mỗi 3 giây
-  void startAutoRefresh() {
-    Timer.periodic(Duration(seconds: 1), (timer) {
-      fetchFriends();
-      fetchGroups();
-    });
-  }
-
-  // 🔹 Lấy danh sách bạn bè từ API
-  Future<void> fetchFriends() async {
-    try {
-      final friendsList = await _friendService.getFriends(widget.currentUserId);
-      if (mounted) {
-        setState(() {
-          friends = friendsList;
-          isLoadingFriends = false;
-        });
-      }
-    } catch (e) {
-      print("❌ Lỗi khi lấy danh sách bạn bè: $e");
-      if (mounted) setState(() => isLoadingFriends = false);
-    }
-  }
-
-  // 🔹 Lấy danh sách nhóm từ API
-  Future<void> fetchGroups() async {
-    try {
-      final groupsList = await _friendService.getGroups(widget.currentUserId);
-      if (mounted) {
-        setState(() {
-          groups = groupsList;
-          isLoadingGroups = false;
-        });
-      }
-    } catch (e) {
-      print("❌ Lỗi khi lấy danh sách nhóm: $e");
-      if (mounted) setState(() => isLoadingGroups = false);
-    }
-  }
-
+  
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildZaloAppBar(),
-      backgroundColor: Color(0xFFF3F3F3),
-      body: Column(
-        children: [
-          _buildSearchBar(), // 🔍 Thanh tìm kiếm
-          Expanded(
-            child: ListView(
-              children: [
-                _buildCreateGroupButton(), // 🔥 Nút tạo nhóm
-                _buildFriendList(), // 🔹 Danh sách bạn bè
-                _buildGroupList(), // 🔹 Danh sách nhóm
-              ],
-            ),
-          ),
-        ],
+    return BlocProvider(
+      create: (context) => FriendListBloc()
+        ..add(FetchFriends(widget.currentUserId))
+        ..add(FetchGroups(widget.currentUserId))
+        ..add(StartAutoRefresh(widget.currentUserId)),
+      child: BlocBuilder<FriendListBloc, FriendListState>(
+        builder: (context, state) {
+          if (state is FriendListLoading) {
+            return Scaffold(
+              appBar: _buildZaloAppBar(),
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (state is FriendListError) {
+            return Scaffold(
+              appBar: _buildZaloAppBar(),
+              body: Center(child: Text(state.message)),
+            );
+          }
+          if (state is FriendListLoaded) {
+            return Scaffold(
+              appBar: _buildZaloAppBar(),
+              backgroundColor: Color(0xFFF3F3F3),
+              body: Column(
+                children: [
+                  _buildSearchBar(),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        _buildCreateGroupButton(),
+                        _buildFriendList(state.friends),
+                        _buildGroupList(state.groups),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return Container();
+        },
       ),
     );
   }
@@ -124,7 +99,6 @@ class _FriendListScreenState extends State<FriendListScreen> {
                         AddFriendScreen(currentUserId: widget.currentUserId),
               ),
             );
-            fetchFriends();
           },
         ),
         IconButton(
@@ -139,7 +113,6 @@ class _FriendListScreenState extends State<FriendListScreen> {
                     ),
               ),
             );
-            fetchFriends();
           },
         ),
       ],
@@ -166,7 +139,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
   }
 
   // 🔥 **Danh sách bạn bè**
-  Widget _buildFriendList() {
+  Widget _buildFriendList(List<Map<String, dynamic>> friends) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -177,9 +150,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
-        isLoadingFriends
-            ? Center(child: CircularProgressIndicator())
-            : friends.isEmpty
+        friends.isEmpty
             ? Center(
               child: Text("Chưa có bạn bè", style: TextStyle(fontSize: 17)),
             )
@@ -195,7 +166,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
   }
 
   // 🔥 **Danh sách nhóm**
-  Widget _buildGroupList() {
+  Widget _buildGroupList(List<Map<String, dynamic>> groups) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -206,9 +177,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
-        isLoadingGroups
-            ? Center(child: CircularProgressIndicator())
-            : groups.isEmpty
+        groups.isEmpty
             ? Center(
               child: Text(
                 "Bạn chưa tham gia nhóm nào",
@@ -235,7 +204,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
                   (context) =>
                       CreateGroupScreen(currentUserId: widget.currentUserId),
             ),
-          ).then((_) => fetchGroups());
+          ).then((_) {context.read<FriendListBloc>().add(FetchGroups(widget.currentUserId));});
         },
         icon: Icon(Icons.group_add, color: Colors.white),
         label: Text("Tạo nhóm mới", style: TextStyle(color: Colors.white)),
