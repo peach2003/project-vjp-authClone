@@ -273,8 +273,8 @@ Xin hãy kỳ vọng vào Nakayama Shoji.''',
                       borderRadius: BorderRadius.circular(8),
                       child: Image.network(
                         company.imageUrl ?? "https://via.placeholder.com/80",
-                        width:80,
-                        height:80,
+                        width: 80,
+                        height: 80,
                         fit: BoxFit.contain,
                         errorBuilder:
                             (context, error, stackTrace) => Icon(
@@ -454,7 +454,10 @@ Xin hãy kỳ vọng vào Nakayama Shoji.''',
                 fontSize: 17,
               ),
             ),
-            TextSpan(text: value, style: TextStyle(color: Colors.black, fontSize: 17)),
+            TextSpan(
+              text: value,
+              style: TextStyle(color: Colors.black, fontSize: 17),
+            ),
           ],
         ),
       ),

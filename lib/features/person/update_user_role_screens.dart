@@ -28,9 +28,13 @@ class _UpdateUserRoleScreenState extends State<UpdateUserRoleScreen> {
     bool success = await AuthService().updateUserRole(username, newRole);
     if (success) {
       fetchUsers();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Cập nhật quyền thành công")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Cập nhật quyền thành công")));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Lỗi cập nhật quyền")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Lỗi cập nhật quyền")));
     }
   }
 
@@ -53,13 +57,25 @@ class _UpdateUserRoleScreenState extends State<UpdateUserRoleScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ListTile(
-                title: Text(user['username'], style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text("Vai trò: ${user['role']}", style: TextStyle(color: Colors.grey[700])),
+                title: Text(
+                  user['username'],
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  "Vai trò: ${user['role']}",
+                  style: TextStyle(color: Colors.grey[700]),
+                ),
                 trailing: DropdownButton<String>(
                   value: user['role'],
-                  items: ["doanh_nghiep", "chuyen_gia", "tu_van_vien", "operator"]
-                      .map((role) => DropdownMenuItem(value: role, child: Text(role)))
-                      .toList(),
+                  items:
+                      ["doanh_nghiep", "chuyen_gia", "tu_van_vien", "operator"]
+                          .map(
+                            (role) => DropdownMenuItem(
+                              value: role,
+                              child: Text(role),
+                            ),
+                          )
+                          .toList(),
                   onChanged: (newRole) {
                     if (newRole != null) {
                       updateUserRole(user['username'], newRole);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import '../chat/friend_list/screens/friend_list_screen.dart';
+import '../contact/screens/test_upload.dart';
 import '../home/screens/home_screen.dart';
 import '../person/person_screen.dart';
 
@@ -19,7 +20,7 @@ class _BottomNavbarState extends State<BottomNavbar> {
     HomeScreen(),
     Text('Search Screen'),
     FriendListScreen(currentUserId: currentUserId), // ✅ Thêm danh sách bạn bè
-    Text('Feed Screen'),
+    TestUploadScreen(),
     ProfileScreen(),
   ];
 
@@ -32,7 +33,9 @@ class _BottomNavbarState extends State<BottomNavbar> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(child: _widgetOptions(widget.currentUserId).elementAt(_selectedIndex)),
+      body: Center(
+        child: _widgetOptions(widget.currentUserId).elementAt(_selectedIndex),
+      ),
       bottomNavigationBar: CurvedNavigationBar(
         backgroundColor: Colors.transparent,
         color: Color.fromARGB(255, 249, 213, 63),
@@ -58,7 +61,7 @@ class _BottomNavbarState extends State<BottomNavbar> {
       duration: Duration(milliseconds: 300),
       width: _selectedIndex == index ? 40 : 30,
       height: _selectedIndex == index ? 40 : 30,
-      child: Icon(icon, color: Color.fromARGB(255, 242, 66, 54),),
+      child: Icon(icon, color: Color.fromARGB(255, 242, 66, 54)),
     );
   }
 }

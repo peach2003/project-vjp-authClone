@@ -37,14 +37,41 @@ class SendMessage extends ChatEvent {
   List<Object> get props => [currentUserId, receiverId, message, messageType];
 }
 
+class SendImageOrVideo extends ChatEvent {
+  final int currentUserId;
+  final int receiverId;
+  final String filePath;
+
+  const SendImageOrVideo({
+    required this.currentUserId,
+    required this.receiverId,
+    required this.filePath,
+  });
+
+  @override
+  List<Object> get props => [currentUserId, receiverId, filePath];
+}
+
+class SendFile extends ChatEvent {
+  final int currentUserId;
+  final int receiverId;
+  final String filePath;
+
+  const SendFile({
+    required this.currentUserId,
+    required this.receiverId,
+    required this.filePath,
+  });
+
+  @override
+  List<Object> get props => [currentUserId, receiverId, filePath];
+}
+
 class AutoRefresh extends ChatEvent {
   final int currentUserId;
   final int receiverId;
 
-  const AutoRefresh({
-    required this.currentUserId,
-    required this.receiverId,
-  });
+  const AutoRefresh({required this.currentUserId, required this.receiverId});
 
   @override
   List<Object> get props => [currentUserId, receiverId];

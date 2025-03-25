@@ -190,7 +190,6 @@ class ExpertCarousel extends StatelessWidget {
                         CircleAvatar(
                           backgroundImage: NetworkImage(expert['avatar']),
                           radius: 60,
-                          
                         ),
                         SizedBox(height: 15),
                         Text(

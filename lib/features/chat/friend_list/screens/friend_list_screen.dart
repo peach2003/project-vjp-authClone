@@ -23,14 +23,15 @@ class FriendListScreen extends StatefulWidget {
 }
 
 class _FriendListScreenState extends State<FriendListScreen> {
-  
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => FriendListBloc()
-        ..add(FetchFriends(widget.currentUserId))
-        ..add(FetchGroups(widget.currentUserId))
-        ..add(StartAutoRefresh(widget.currentUserId)),
+      create:
+          (context) =>
+              FriendListBloc()
+                ..add(FetchFriends(widget.currentUserId))
+                ..add(FetchGroups(widget.currentUserId))
+                ..add(StartAutoRefresh(widget.currentUserId)),
       child: BlocBuilder<FriendListBloc, FriendListState>(
         builder: (context, state) {
           if (state is FriendListLoading) {
@@ -55,7 +56,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
                   Expanded(
                     child: ListView(
                       children: [
-                        _buildCreateGroupButton(),
+                        // _buildCreateGroupButton(),
                         _buildFriendList(state.friends),
                         _buildGroupList(state.groups),
                       ],
@@ -89,33 +90,151 @@ class _FriendListScreenState extends State<FriendListScreen> {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.person_add, color: Colors.white),
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) =>
-                        AddFriendScreen(currentUserId: widget.currentUserId),
-              ),
-            );
+          icon: Image.asset(
+            'assets/images/plus.png',
+            width: 20,
+            height: 20,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            _showOptionsMenu(context);
           },
         ),
-        IconButton(
-          icon: Icon(Icons.notifications, color: Colors.white),
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) => FriendRequestScreen(
-                      currentUserId: widget.currentUserId,
-                    ),
-              ),
-            );
-          },
+        SizedBox(width: 10),
+      ],
+    );
+  }
+
+  // 🔥 **Menu tùy chọn dưới icon**
+  void _showOptionsMenu(BuildContext context) {
+    final RenderBox button = context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    final RelativeRect position = RelativeRect.fromLTRB(
+      button.localToGlobal(Offset.zero, ancestor: overlay).dx +
+          button.size.width -
+          180,
+      button.localToGlobal(Offset.zero, ancestor: overlay).dy + kToolbarHeight,
+      20,
+      0,
+    );
+
+    showMenu(
+      context: context,
+      position: position,
+      color: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      items: [
+        _buildPopupMenuItemWithImage(
+          'Thêm bạn',
+          'assets/images/add-user.png',
+          Colors.blue,
+        ),
+        _buildDivider(),
+        _buildPopupMenuItemWithImage(
+          'Lời mời kết bạn',
+          'assets/images/notificaton.png',
+          Colors.orange,
+        ),
+        _buildDivider(),
+        _buildPopupMenuItemWithImage(
+          'Tạo nhóm',
+          'assets/images/add_group.png',
+          Colors.green,
         ),
       ],
+    ).then((value) {
+      if (value == null) return;
+
+      switch (value) {
+        case 'Thêm bạn':
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) =>
+                      AddFriendScreen(currentUserId: widget.currentUserId),
+            ),
+          );
+          break;
+        case 'Lời mời kết bạn':
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) =>
+                      FriendRequestScreen(currentUserId: widget.currentUserId),
+            ),
+          );
+          break;
+        case 'Tạo nhóm':
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) =>
+                      CreateGroupScreen(currentUserId: widget.currentUserId),
+            ),
+          ).then((_) {
+            context.read<FriendListBloc>().add(
+              FetchGroups(widget.currentUserId),
+            );
+          });
+          break;
+        default:
+          break;
+      }
+    });
+  }
+
+  // Tạo divider giữa các mục menu
+  PopupMenuItem<String> _buildDivider() {
+    return PopupMenuItem<String>(
+      enabled: false,
+      height: 1,
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: Divider(height: 1, color: Colors.grey.withOpacity(0.3)),
+    );
+  }
+
+  // 🔥 **Item trong Menu Popup với hình ảnh**
+  PopupMenuItem<String> _buildPopupMenuItemWithImage(
+    String title,
+    String imagePath,
+    Color iconColor,
+  ) {
+    return PopupMenuItem<String>(
+      value: title,
+      height: 46,
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Image.asset(
+              imagePath,
+              width: 18,
+              height: 18,
+              color: iconColor,
+            ),
+          ),
+          SizedBox(width: 14),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w500,
+              color: Colors.black.withOpacity(0.8),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -191,7 +310,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
     );
   }
 
-  // 🔥 **Nút tạo nhóm**
+  /*// 🔥 **Nút tạo nhóm**
   Widget _buildCreateGroupButton() {
     return Padding(
       padding: EdgeInsets.all(10),
@@ -204,7 +323,11 @@ class _FriendListScreenState extends State<FriendListScreen> {
                   (context) =>
                       CreateGroupScreen(currentUserId: widget.currentUserId),
             ),
-          ).then((_) {context.read<FriendListBloc>().add(FetchGroups(widget.currentUserId));});
+          ).then((_) {
+            context.read<FriendListBloc>().add(
+              FetchGroups(widget.currentUserId),
+            );
+          });
         },
         icon: Icon(Icons.group_add, color: Colors.white),
         label: Text("Tạo nhóm mới", style: TextStyle(color: Colors.white)),
@@ -214,7 +337,7 @@ class _FriendListScreenState extends State<FriendListScreen> {
         ),
       ),
     );
-  }
+  }*/
 
   // 🔥 **UI danh sách bạn bè giống Zalo**
   Widget _buildFriendItem(Map<String, dynamic> friend, bool isOnline) {

@@ -34,12 +34,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Thông Tin Cá Nhân", style: TextStyle(color: Colors.white),),
+        title: Text("Thông Tin Cá Nhân", style: TextStyle(color: Colors.white)),
         centerTitle: true,
         actions: [
           if (role == "operator") // Chỉ hiển thị nếu user có quyền operator
             IconButton(
-              icon: Icon(Icons.admin_panel_settings_outlined, size: 30, color: Colors.white,),
+              icon: Icon(
+                Icons.admin_panel_settings_outlined,
+                size: 30,
+                color: Colors.white,
+              ),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -106,7 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.logout, color: Colors.white, size: 25 ,),
+                  Icon(Icons.logout, color: Colors.white, size: 25),
                   SizedBox(width: 10),
                   Text(
                     "Đăng Xuất",

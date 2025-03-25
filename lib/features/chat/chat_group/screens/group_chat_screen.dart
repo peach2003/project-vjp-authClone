@@ -101,24 +101,6 @@ class _GroupChatContentState extends State<_GroupChatContent> {
     super.dispose();
   }
 
-  void _sendMessage() {
-    final message = _messageController.text.trim();
-    if (message.isEmpty) return;
-
-    _messageController.clear();
-    setState(() {
-      isTyping = false;
-    });
-
-    context.read<GroupChatBloc>().add(
-      SendGroupMessage(
-        groupId: widget.groupId,
-        senderId: widget.currentUserId,
-        message: message,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -321,7 +303,22 @@ class _GroupChatContentState extends State<_GroupChatContent> {
                 border: InputBorder.none,
               ),
               textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _sendMessage(),
+              onSubmitted: (_) {
+                final message = _messageController.text.trim();
+                if (message.isNotEmpty) {
+                  context.read<GroupChatBloc>().add(
+                    SendGroupMessage(
+                      groupId: widget.groupId,
+                      senderId: widget.currentUserId,
+                      message: message,
+                    ),
+                  );
+                  _messageController.clear();
+                  setState(() {
+                    isTyping = false;
+                  });
+                }
+              },
             ),
           ),
           if (!isTyping) ...[
@@ -339,7 +336,22 @@ class _GroupChatContentState extends State<_GroupChatContent> {
             ),
           ] else
             FloatingActionButton(
-              onPressed: _sendMessage,
+              onPressed: () {
+                final message = _messageController.text.trim();
+                if (message.isNotEmpty) {
+                  context.read<GroupChatBloc>().add(
+                    SendGroupMessage(
+                      groupId: widget.groupId,
+                      senderId: widget.currentUserId,
+                      message: message,
+                    ),
+                  );
+                  _messageController.clear();
+                  setState(() {
+                    isTyping = false;
+                  });
+                }
+              },
               mini: true,
               backgroundColor: Colors.blueAccent,
               child: Icon(Icons.send, color: Colors.white, size: 20),

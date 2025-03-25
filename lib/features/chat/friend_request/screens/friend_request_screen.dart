@@ -6,7 +6,6 @@ import '../bloc/friend_request_bloc.dart';
 import '../bloc/friend_request_event.dart';
 import '../bloc/friend_request_state.dart';
 
-
 class FriendRequestScreen extends StatefulWidget {
   final int currentUserId;
   const FriendRequestScreen({Key? key, required this.currentUserId})
@@ -17,12 +16,13 @@ class FriendRequestScreen extends StatefulWidget {
 }
 
 class _FriendRequestScreenState extends State<FriendRequestScreen> {
-  
- @override
+  @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => FriendRequestBloc()
-        ..add(FetchFriendRequests(widget.currentUserId)),
+      create:
+          (context) =>
+              FriendRequestBloc()
+                ..add(FetchFriendRequests(widget.currentUserId)),
       child: FriendRequestContent(currentUserId: widget.currentUserId),
     );
   }
@@ -31,16 +31,17 @@ class _FriendRequestScreenState extends State<FriendRequestScreen> {
 class FriendRequestContent extends StatelessWidget {
   final int currentUserId;
 
-  const FriendRequestContent({Key? key, required this.currentUserId}) : super(key: key);
+  const FriendRequestContent({Key? key, required this.currentUserId})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<FriendRequestBloc, FriendRequestState>(
       listener: (context, state) {
         if (state is FriendRequestError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
         }
       },
       builder: (context, state) {
@@ -57,14 +58,17 @@ class FriendRequestContent extends StatelessWidget {
     if (state is FriendRequestLoading) {
       return Center(child: CircularProgressIndicator());
     }
-    
+
     if (state is FriendRequestLoaded) {
       if (state.requests.isEmpty) {
         return Center(
-          child: Text("Không có lời mời kết bạn", style: TextStyle(fontSize: 17)),
+          child: Text(
+            "Không có lời mời kết bạn",
+            style: TextStyle(fontSize: 17),
+          ),
         );
       }
-      
+
       return ListView.builder(
         itemCount: state.requests.length,
         itemBuilder: (context, index) {
@@ -99,7 +103,10 @@ class FriendRequestContent extends StatelessWidget {
     );
   }
 
-  Widget _buildFriendRequestItem(BuildContext context, Map<String, dynamic> user) {
+  Widget _buildFriendRequestItem(
+    BuildContext context,
+    Map<String, dynamic> user,
+  ) {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
       padding: EdgeInsets.all(12),

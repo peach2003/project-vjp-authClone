@@ -58,15 +58,16 @@ class LoginScreen extends StatelessWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            BottomNavbar(currentUserId: state.userId),
+                        builder:
+                            (context) =>
+                                BottomNavbar(currentUserId: state.userId),
                       ),
                     );
                   }
                   if (state is AuthFailure) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(state.error)),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(state.error)));
                   }
                 },
                 builder: (context, state) {
@@ -87,11 +88,16 @@ class LoginScreen extends StatelessWidget {
                       ),
                       minimumSize: Size(double.infinity, 50),
                     ),
-                    child: state is AuthLoading
-                        ? CircularProgressIndicator(color: Colors.white)
-                        : Text("Đăng nhập",
-                        style:
-                        TextStyle(fontSize: 16, color: Colors.white)),
+                    child:
+                        state is AuthLoading
+                            ? CircularProgressIndicator(color: Colors.white)
+                            : Text(
+                              "Đăng nhập",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
                   );
                 },
               ),
@@ -166,15 +172,19 @@ class LoginScreen extends StatelessWidget {
       onPressed: () async {
         int? userId = await _googleAuthService.signInWithGoogle();
         if (userId != null) {
-          print("🎯 Đăng nhập Google thành công! Chuyển đến Home với userId: $userId");
+          print(
+            "🎯 Đăng nhập Google thành công! Chuyển đến Home với userId: $userId",
+          );
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => BottomNavbar(currentUserId: userId)),
+            MaterialPageRoute(
+              builder: (context) => BottomNavbar(currentUserId: userId),
+            ),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("❌ Lỗi đăng nhập Google")),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("❌ Lỗi đăng nhập Google")));
         }
       },
     );

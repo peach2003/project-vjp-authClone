@@ -18,23 +18,20 @@ class ChatLoaded extends ChatState {
 
   @override
   List<Object> get props => [messages];
-
-  bool hasNewMessages(ChatLoaded other) {
-    if (messages.length != other.messages.length) return true;
-
-    if (messages.isNotEmpty && other.messages.isNotEmpty) {
-      return messages.last['id'] != other.messages.last['id'];
-    }
-
-    return false;
-  }
-
-  ChatLoaded copyWith({List<Map<String, dynamic>>? messages}) {
-    return ChatLoaded(messages: messages ?? this.messages);
-  }
 }
 
 class ChatMessageSent extends ChatState {}
+
+class ChatUploadLoading extends ChatState {}
+
+class ChatUploadSuccess extends ChatState {
+  final Map<String, dynamic> uploadResult;
+
+  const ChatUploadSuccess({required this.uploadResult});
+
+  @override
+  List<Object> get props => [uploadResult];
+}
 
 class ChatError extends ChatState {
   final String message;

@@ -62,19 +62,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     value: selectedRole,
                     icon: Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
                     style: TextStyle(fontSize: 16, color: Colors.black),
-                    items: [
-                      "doanh_nghiep",
-                      "chuyen_gia",
-                      "tu_van_vien",
-                      "operator"
-                    ]
-                        .map(
-                          (role) => DropdownMenuItem(
-                        value: role,
-                        child: Text(role.replaceAll("_", " ").toUpperCase()),
-                      ),
-                    )
-                        .toList(),
+                    items:
+                        [
+                              "doanh_nghiep",
+                              "chuyen_gia",
+                              "tu_van_vien",
+                              "operator",
+                            ]
+                            .map(
+                              (role) => DropdownMenuItem(
+                                value: role,
+                                child: Text(
+                                  role.replaceAll("_", " ").toUpperCase(),
+                                ),
+                              ),
+                            )
+                            .toList(),
                     onChanged: (value) => setState(() => selectedRole = value!),
                   ),
                 ),
@@ -92,9 +95,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Navigator.pop(context);
                   }
                   if (state is AuthFailure) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("❌ ${state.error}")),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text("❌ ${state.error}")));
                   }
                 },
                 builder: (context, state) {
@@ -116,12 +119,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       minimumSize: Size(double.infinity, 50),
                     ),
-                    child: state is AuthLoading
-                        ? CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                      "Đăng ký",
-                      style: TextStyle(fontSize: 16, color: Colors.white),
-                    ),
+                    child:
+                        state is AuthLoading
+                            ? CircularProgressIndicator(color: Colors.white)
+                            : Text(
+                              "Đăng ký",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
                   );
                 },
               ),
