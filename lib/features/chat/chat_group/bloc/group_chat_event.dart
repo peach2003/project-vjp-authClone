@@ -1,34 +1,37 @@
 import 'package:equatable/equatable.dart';
 
-abstract class GroupChatEvent extends Equatable {
-  const GroupChatEvent();
+abstract class GroupChatEvent {}
 
-  @override
-  List<Object> get props => [];
-}
-
-class FetchGroupMessages extends GroupChatEvent {
+class FetchGroupChatHistory extends GroupChatEvent {
   final int groupId;
 
-  const FetchGroupMessages(this.groupId);
+  FetchGroupChatHistory({required this.groupId});
+}
 
-  @override
-  List<Object> get props => [groupId];
+class LoadMoreGroupMessages extends GroupChatEvent {
+  final int groupId;
+  final int page;
+  final int limit;
+
+  LoadMoreGroupMessages({
+    required this.groupId,
+    required this.page,
+    required this.limit,
+  });
 }
 
 class SendGroupMessage extends GroupChatEvent {
   final int groupId;
   final int senderId;
   final String message;
+  final String messageType;
 
-  const SendGroupMessage({
+  SendGroupMessage({
     required this.groupId,
     required this.senderId,
     required this.message,
+    required this.messageType,
   });
-
-  @override
-  List<Object> get props => [groupId, senderId, message];
 }
 
 class SendGroupImageOrVideo extends GroupChatEvent {
@@ -36,14 +39,11 @@ class SendGroupImageOrVideo extends GroupChatEvent {
   final int senderId;
   final String filePath;
 
-  const SendGroupImageOrVideo({
+  SendGroupImageOrVideo({
     required this.groupId,
     required this.senderId,
     required this.filePath,
   });
-
-  @override
-  List<Object> get props => [groupId, senderId, filePath];
 }
 
 class SendGroupFile extends GroupChatEvent {
@@ -51,21 +51,15 @@ class SendGroupFile extends GroupChatEvent {
   final int senderId;
   final String filePath;
 
-  const SendGroupFile({
+  SendGroupFile({
     required this.groupId,
     required this.senderId,
     required this.filePath,
   });
-
-  @override
-  List<Object> get props => [groupId, senderId, filePath];
 }
 
-class AutoRefresh extends GroupChatEvent {
+class AutoRefreshGroup extends GroupChatEvent {
   final int groupId;
 
-  const AutoRefresh(this.groupId);
-
-  @override
-  List<Object> get props => [groupId];
+  AutoRefreshGroup({required this.groupId});
 }

@@ -1,13 +1,12 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 import 'package:path/path.dart' as path;
 
 class GroupUploadService {
   final Dio _dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3000"));
 
-  // Upload ảnh hoặc video cho nhóm
   Future<Map<String, dynamic>?> uploadGroupImageOrVideo({
     required String filePath,
     required int sender,
@@ -46,7 +45,6 @@ class GroupUploadService {
     }
   }
 
-  // Upload file cho nhóm
   Future<Map<String, dynamic>?> uploadGroupFile({
     required String filePath,
     required int sender,
@@ -99,7 +97,6 @@ class GroupUploadService {
     }
   }
 
-  // Xác định MIME type dựa trên đuôi file
   String _getMimeType(String extension) {
     extension = extension.toLowerCase();
     switch (extension) {

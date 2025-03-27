@@ -26,7 +26,9 @@ class GroupChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => GroupChatBloc()..add(FetchGroupMessages(groupId)),
+      create:
+          (context) =>
+              GroupChatBloc()..add(FetchGroupChatHistory(groupId: groupId)),
       child: _GroupChatContent(
         currentUserId: currentUserId,
         groupId: groupId,
@@ -55,18 +57,23 @@ class _GroupChatContent extends StatefulWidget {
 class _GroupChatContentState extends State<_GroupChatContent> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
+  bool _shouldScrollToBottom = false;
+  double? _previousScrollPosition;
+
   Timer? _refreshTimer;
   List<Map<String, dynamic>> messages = [];
   bool isTyping = false;
   bool showOptions = false;
-  late GroupChatBloc _chatBloc;
+  late GroupChatBloc _groupChatBloc;
 
   @override
   void initState() {
     super.initState();
-    _chatBloc = GroupChatBloc();
+    _groupChatBloc = GroupChatBloc();
+    _shouldScrollToBottom = true;
 
-    _chatBloc.add(FetchGroupMessages(widget.groupId));
+    _groupChatBloc.add(FetchGroupChatHistory(groupId: widget.groupId));
 
     startAutoRefresh();
 
@@ -76,20 +83,51 @@ class _GroupChatContentState extends State<_GroupChatContent> {
       });
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom(force: true);
-    });
+    _scrollController.addListener(_onScroll);
   }
 
   void startAutoRefresh() {
-    _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (mounted) {
-        _chatBloc.add(AutoRefresh(widget.groupId));
+    _refreshTimer = Timer.periodic(Duration(seconds: 3), (timer) {
+      if (!_isLoadingMore && mounted) {
+        _groupChatBloc.add(AutoRefreshGroup(groupId: widget.groupId));
       }
     });
   }
 
-  void _sendMessage() {
+  void _onScroll() {
+    if (!_isLoadingMore &&
+        _scrollController.hasClients &&
+        messages.length >= 10 &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200) {
+      _previousScrollPosition = _scrollController.position.pixels;
+      _loadMoreMessages();
+    }
+  }
+
+  void _loadMoreMessages() {
+    final currentState = _groupChatBloc.state;
+    if (currentState is GroupChatLoaded) {
+      final pagination = currentState.pagination;
+      final nextPage = pagination['currentPage'] + 1;
+
+      if (nextPage <= pagination['totalPages']) {
+        setState(() {
+          _isLoadingMore = true;
+        });
+
+        _groupChatBloc.add(
+          LoadMoreGroupMessages(
+            groupId: widget.groupId,
+            page: nextPage,
+            limit: pagination['messagesPerPage'],
+          ),
+        );
+      }
+    }
+  }
+
+  void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
     final messageText = _messageController.text.trim();
@@ -103,46 +141,45 @@ class _GroupChatContentState extends State<_GroupChatContent> {
     };
 
     setState(() {
-      messages.add(newMessage);
+      messages.insert(0, newMessage);
       isTyping = false;
+      _shouldScrollToBottom = true;
     });
 
-    _scrollToBottom(force: true);
-
-    _chatBloc.add(
+    _groupChatBloc.add(
       SendGroupMessage(
         groupId: widget.groupId,
         senderId: widget.currentUserId,
         message: messageText,
+        messageType: "text",
       ),
     );
   }
 
-  void _scrollToBottom({bool force = false}) {
-    Future.delayed(Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        if (force ||
-            _scrollController.position.pixels >=
-                _scrollController.position.maxScrollExtent - 100) {
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        }
-      }
-    });
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     _messageController.dispose();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _chatBloc.close();
+    _groupChatBloc.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
-      value: _chatBloc,
+      value: _groupChatBloc,
       child: Builder(
         builder: (context) {
           return BlocListener<GroupChatBloc, GroupChatState>(
@@ -152,19 +189,27 @@ class _GroupChatContentState extends State<_GroupChatContent> {
                   context,
                 ).showSnackBar(SnackBar(content: Text(state.message)));
               } else if (state is GroupChatLoaded) {
+                final wasAtBottom =
+                    _scrollController.hasClients &&
+                    _scrollController.position.pixels <= 50;
+
                 setState(() {
-                  messages =
-                      List<Map<String, dynamic>>.from(state.messages).map((
-                        msg,
-                      ) {
-                        if (msg["created_at"] is String) {
-                          msg["created_at"] =
-                              DateTime.parse(msg["created_at"]).toLocal();
-                        }
-                        return msg;
-                      }).toList();
+                  messages = List<Map<String, dynamic>>.from(state.messages);
+                  _isLoadingMore = false;
                 });
-                _scrollToBottom();
+
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (state.isFirstLoad || _shouldScrollToBottom) {
+                    _shouldScrollToBottom = false;
+                    _scrollToBottom();
+                  } else if (wasAtBottom && !_isLoadingMore) {
+                    _scrollToBottom();
+                  } else if (_isLoadingMore &&
+                      _previousScrollPosition != null) {
+                    _scrollController.jumpTo(_previousScrollPosition!);
+                    _previousScrollPosition = null;
+                  }
+                });
               }
             },
             child: Scaffold(
@@ -194,26 +239,43 @@ class _GroupChatContentState extends State<_GroupChatContent> {
         children: [
           BlocBuilder<GroupChatBloc, GroupChatState>(
             builder: (context, state) {
+              if (state is GroupChatLoading && messages.isEmpty) {
+                return Center(child: CircularProgressIndicator());
+              }
+
               return Column(
                 children: [
                   Expanded(
-                    child:
-                        state is GroupChatLoading && messages.isEmpty
-                            ? Center(child: CircularProgressIndicator())
-                            : ListView.builder(
-                              controller: _scrollController,
-                              itemCount: messages.length,
-                              itemBuilder: (context, index) {
-                                final message = messages[index];
-                                bool isMe =
-                                    message["sender"] == widget.currentUserId;
-                                return GroupMessageBubble(
-                                  message: message,
-                                  isMe: isMe,
-                                  parentContext: context,
-                                );
-                              },
+                    child: Stack(
+                      children: [
+                        ListView.builder(
+                          controller: _scrollController,
+                          reverse: true,
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            bool isMe =
+                                message["sender"] == widget.currentUserId;
+                            return GroupMessageBubble(
+                              message: message,
+                              isMe: isMe,
+                              parentContext: context,
+                            );
+                          },
+                        ),
+                        if (_isLoadingMore)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              color: Colors.black12,
+                              padding: EdgeInsets.all(8.0),
+                              child: Center(child: CircularProgressIndicator()),
                             ),
+                          ),
+                      ],
+                    ),
                   ),
                   GroupMessageInput(
                     controller: _messageController,
@@ -241,7 +303,7 @@ class _GroupChatContentState extends State<_GroupChatContent> {
                             showOptions = false;
                           });
 
-                          _chatBloc.add(
+                          _groupChatBloc.add(
                             SendGroupImageOrVideo(
                               groupId: widget.groupId,
                               senderId: widget.currentUserId,

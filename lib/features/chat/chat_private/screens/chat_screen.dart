@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart'; 
+import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -36,10 +36,13 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
+  bool _shouldScrollToBottom = false;
+  double? _previousScrollPosition;
 
   Timer? _refreshTimer;
   List<Map<String, dynamic>> messages = [];
-  bool isTyping = false; // Trạng thái nhập tin nhắn
+  bool isTyping = false;
   bool showOptions = false;
   late ChatBloc _chatBloc;
 
@@ -47,8 +50,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _chatBloc = ChatBloc();
+    _shouldScrollToBottom = true;
 
-    // Khởi tạo và gửi event lấy lịch sử chat
     _chatBloc.add(
       FetchChatHistory(
         currentUserId: widget.currentUserId,
@@ -58,29 +61,60 @@ class _ChatScreenState extends State<ChatScreen> {
 
     startAutoRefresh();
 
-    // Lắng nghe nhập liệu để ẩn/hiện icon
     _messageController.addListener(() {
       setState(() {
         isTyping = _messageController.text.trim().isNotEmpty;
       });
     });
 
-    // Cuộn xuống tin nhắn mới nhất khi mở màn hình chat
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom(force: true);
-    });
+    _scrollController.addListener(_onScroll);
   }
 
   void startAutoRefresh() {
-    _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      // Sử dụng AutoRefresh event từ bloc
-      _chatBloc.add(
-        AutoRefresh(
-          currentUserId: widget.currentUserId,
-          receiverId: widget.receiverId,
-        ),
-      );
+    _refreshTimer = Timer.periodic(Duration(seconds: 3), (timer) {
+      if (!_isLoadingMore && mounted) {
+        _chatBloc.add(
+          AutoRefresh(
+            currentUserId: widget.currentUserId,
+            receiverId: widget.receiverId,
+          ),
+        );
+      }
     });
+  }
+
+  void _onScroll() {
+    if (!_isLoadingMore &&
+        _scrollController.hasClients &&
+        messages.length >= 10 &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200) {
+      _previousScrollPosition = _scrollController.position.pixels;
+      _loadMoreMessages();
+    }
+  }
+
+  void _loadMoreMessages() {
+    final currentState = _chatBloc.state;
+    if (currentState is ChatLoaded) {
+      final pagination = currentState.pagination;
+      final nextPage = pagination['currentPage'] + 1;
+
+      if (nextPage <= pagination['totalPages']) {
+        setState(() {
+          _isLoadingMore = true;
+        });
+
+        _chatBloc.add(
+          LoadMoreMessages(
+            currentUserId: widget.currentUserId,
+            receiverId: widget.receiverId,
+            page: nextPage,
+            limit: pagination['messagesPerPage'],
+          ),
+        );
+      }
+    }
   }
 
   void _sendMessage() async {
@@ -89,7 +123,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final messageText = _messageController.text.trim();
     _messageController.clear();
 
-    // Thêm tin nhắn tạm thời vào UI để hiển thị ngay
     final newMessage = {
       "sender": widget.currentUserId,
       "receiver": widget.receiverId,
@@ -99,13 +132,11 @@ class _ChatScreenState extends State<ChatScreen> {
     };
 
     setState(() {
-      messages.add(newMessage);
+      messages.insert(0, newMessage);
       isTyping = false;
+      _shouldScrollToBottom = true;
     });
 
-    _scrollToBottom(force: true);
-
-    // Gửi tin nhắn thông qua bloc
     _chatBloc.add(
       SendMessage(
         currentUserId: widget.currentUserId,
@@ -116,22 +147,21 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _scrollToBottom({bool force = false}) {
-    Future.delayed(Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        if (force ||
-            _scrollController.position.pixels >=
-                _scrollController.position.maxScrollExtent - 100) {
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        }
-      }
-    });
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     _messageController.dispose();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _chatBloc.close();
     super.dispose();
@@ -150,20 +180,27 @@ class _ChatScreenState extends State<ChatScreen> {
                   context,
                 ).showSnackBar(SnackBar(content: Text(state.message)));
               } else if (state is ChatLoaded) {
+                final wasAtBottom =
+                    _scrollController.hasClients &&
+                    _scrollController.position.pixels <= 50;
+
                 setState(() {
-                  messages =
-                      List<Map<String, dynamic>>.from(state.messages).map((
-                        msg,
-                      ) {
-                        // Chuyển đổi timestamp sang DateTime local
-                        if (msg["created_at"] is String) {
-                          msg["created_at"] =
-                              DateTime.parse(msg["created_at"]).toLocal();
-                        }
-                        return msg;
-                      }).toList();
+                  messages = List<Map<String, dynamic>>.from(state.messages);
+                  _isLoadingMore = false;
                 });
-                _scrollToBottom();
+
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (state.isFirstLoad || _shouldScrollToBottom) {
+                    _shouldScrollToBottom = false;
+                    _scrollToBottom();
+                  } else if (wasAtBottom && !_isLoadingMore) {
+                    _scrollToBottom();
+                  } else if (_isLoadingMore &&
+                      _previousScrollPosition != null) {
+                    _scrollController.jumpTo(_previousScrollPosition!);
+                    _previousScrollPosition = null;
+                  }
+                });
               }
             },
             child: Scaffold(
@@ -193,72 +230,135 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           BlocBuilder<ChatBloc, ChatState>(
             builder: (context, state) {
+              if (state is ChatLoading && messages.isEmpty) {
+                return Center(child: CircularProgressIndicator());
+              }
+
               return Column(
-            children: [
-              Expanded(
-                    child:
-                        state is ChatLoading && messages.isEmpty
-                            ? Center(child: CircularProgressIndicator())
-                            : ListView.builder(
-                  controller: _scrollController,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final message = messages[index];
-                                bool isMe =
-                                    message["sender"] == widget.currentUserId;
-                                return MessageBubble(
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        ListView.builder(
+                          controller: _scrollController,
+                          reverse: true,
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            bool isMe =
+                                message["sender"] == widget.currentUserId;
+
+                            bool showDate = false;
+                            String? dateString;
+
+                            if (message["created_at"] != null) {
+                              final DateTime messageDate =
+                                  message["created_at"] is DateTime
+                                      ? message["created_at"]
+                                      : DateTime.parse(message["created_at"]);
+
+                              if (index == messages.length - 1) {
+                                showDate = true;
+                                dateString = DateFormat(
+                                  'dd/MM/yyyy',
+                                ).format(messageDate);
+                              } else {
+                                final nextMessage = messages[index + 1];
+                                final DateTime nextDate =
+                                    nextMessage["created_at"] is DateTime
+                                        ? nextMessage["created_at"]
+                                        : DateTime.parse(
+                                          nextMessage["created_at"],
+                                        );
+
+                                if (!isSameDay(messageDate, nextDate)) {
+                                  showDate = true;
+                                  dateString = DateFormat(
+                                    'dd/MM/yyyy',
+                                  ).format(messageDate);
+                                }
+                              }
+                            }
+
+                            return Column(
+                              children: [
+                                if (showDate)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(vertical: 8),
+                                    child: Text(
+                                      dateString!,
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                MessageBubble(
                                   message: message,
                                   isMe: isMe,
                                   parentContext: context,
-                                );
-                              },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        if (_isLoadingMore)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              color: Colors.black12,
+                              padding: EdgeInsets.all(8.0),
+                              child: Center(child: CircularProgressIndicator()),
                             ),
+                          ),
+                      ],
+                    ),
                   ),
                   MessageInput(
-                controller: _messageController,
+                    controller: _messageController,
                     isTyping: isTyping,
                     onSendPressed: _sendMessage,
                     onEllipsisPressed: () {
-                  setState(() {
-                    showOptions = !showOptions;
-                    if (showOptions) {
-                      FocusScope.of(context).unfocus();
-                    }
-                  });
-                },
+                      setState(() {
+                        showOptions = !showOptions;
+                        if (showOptions) {
+                          FocusScope.of(context).unfocus();
+                        }
+                      });
+                    },
                     onMicPressed: () {},
                     onStickerPressed: () {},
                     onImagePressed: () async {
-                    final ImagePicker picker = ImagePicker();
-                    try {
-                      final XFile? image = await picker.pickImage(
-                        source: ImageSource.gallery,
-                      );
-
-                      if (image != null && mounted) {
-                        // Tắt options grid nếu đang mở
-                        setState(() {
-                          showOptions = false;
-                        });
-
-                        // Dispatch event một lần duy nhất
-                        context.read<ChatBloc>().add(
-                          SendImageOrVideo(
-                            currentUserId: widget.currentUserId,
-                            receiverId: widget.receiverId,
-                            filePath: image.path,
-                          ),
+                      final ImagePicker picker = ImagePicker();
+                      try {
+                        final XFile? image = await picker.pickImage(
+                          source: ImageSource.gallery,
                         );
+
+                        if (image != null && mounted) {
+                          setState(() {
+                            showOptions = false;
+                          });
+
+                          context.read<ChatBloc>().add(
+                            SendImageOrVideo(
+                              currentUserId: widget.currentUserId,
+                              receiverId: widget.receiverId,
+                              filePath: image.path,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Lỗi khi chọn ảnh: $e')),
+                          );
+                        }
                       }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Lỗi khi chọn ảnh: $e')),
-                        );
-                      }
-                    }
-                  },
-                ),
+                    },
+                  ),
                   if (showOptions)
                     OptionsGrid(
                       currentUserId: widget.currentUserId,
@@ -279,12 +379,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 return Container(
                   color: Colors.black.withOpacity(0.5),
                   child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         CircularProgressIndicator(color: Colors.white),
                         SizedBox(height: 16),
-                Text(
+                        Text(
                           'Đang gửi tệp...',
                           style: TextStyle(color: Colors.white),
                         ),
@@ -299,5 +399,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  bool isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 }
