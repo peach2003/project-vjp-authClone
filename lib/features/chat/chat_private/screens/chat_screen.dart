@@ -194,16 +194,16 @@ class _ChatScreenState extends State<ChatScreen> {
           BlocBuilder<ChatBloc, ChatState>(
             builder: (context, state) {
               return Column(
-                children: [
-                  Expanded(
+            children: [
+              Expanded(
                     child:
                         state is ChatLoading && messages.isEmpty
                             ? Center(child: CircularProgressIndicator())
                             : ListView.builder(
-                              controller: _scrollController,
-                              itemCount: messages.length,
-                              itemBuilder: (context, index) {
-                                final message = messages[index];
+                  controller: _scrollController,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final message = messages[index];
                                 bool isMe =
                                     message["sender"] == widget.currentUserId;
                                 return MessageBubble(
@@ -215,50 +215,50 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                   ),
                   MessageInput(
-                    controller: _messageController,
+                controller: _messageController,
                     isTyping: isTyping,
                     onSendPressed: _sendMessage,
                     onEllipsisPressed: () {
-                      setState(() {
-                        showOptions = !showOptions;
-                        if (showOptions) {
-                          FocusScope.of(context).unfocus();
-                        }
-                      });
-                    },
+                  setState(() {
+                    showOptions = !showOptions;
+                    if (showOptions) {
+                      FocusScope.of(context).unfocus();
+                    }
+                  });
+                },
                     onMicPressed: () {},
                     onStickerPressed: () {},
                     onImagePressed: () async {
-                      final ImagePicker picker = ImagePicker();
-                      try {
-                        final XFile? image = await picker.pickImage(
-                          source: ImageSource.gallery,
+                    final ImagePicker picker = ImagePicker();
+                    try {
+                      final XFile? image = await picker.pickImage(
+                        source: ImageSource.gallery,
+                      );
+
+                      if (image != null && mounted) {
+                        // Tắt options grid nếu đang mở
+                        setState(() {
+                          showOptions = false;
+                        });
+
+                        // Dispatch event một lần duy nhất
+                        context.read<ChatBloc>().add(
+                          SendImageOrVideo(
+                            currentUserId: widget.currentUserId,
+                            receiverId: widget.receiverId,
+                            filePath: image.path,
+                          ),
                         );
-
-                        if (image != null && mounted) {
-                          // Tắt options grid nếu đang mở
-                          setState(() {
-                            showOptions = false;
-                          });
-
-                          // Dispatch event một lần duy nhất
-                          context.read<ChatBloc>().add(
-                            SendImageOrVideo(
-                              currentUserId: widget.currentUserId,
-                              receiverId: widget.receiverId,
-                              filePath: image.path,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Lỗi khi chọn ảnh: $e')),
-                          );
-                        }
                       }
-                    },
-                  ),
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lỗi khi chọn ảnh: $e')),
+                        );
+                      }
+                    }
+                  },
+                ),
                   if (showOptions)
                     OptionsGrid(
                       currentUserId: widget.currentUserId,
@@ -279,12 +279,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 return Container(
                   color: Colors.black.withOpacity(0.5),
                   child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                         CircularProgressIndicator(color: Colors.white),
                         SizedBox(height: 16),
-                        Text(
+                Text(
                           'Đang gửi tệp...',
                           style: TextStyle(color: Colors.white),
                         ),

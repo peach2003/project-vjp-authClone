@@ -31,6 +31,36 @@ class SendGroupMessage extends GroupChatEvent {
   List<Object> get props => [groupId, senderId, message];
 }
 
+class SendGroupImageOrVideo extends GroupChatEvent {
+  final int groupId;
+  final int senderId;
+  final String filePath;
+
+  const SendGroupImageOrVideo({
+    required this.groupId,
+    required this.senderId,
+    required this.filePath,
+  });
+
+  @override
+  List<Object> get props => [groupId, senderId, filePath];
+}
+
+class SendGroupFile extends GroupChatEvent {
+  final int groupId;
+  final int senderId;
+  final String filePath;
+
+  const SendGroupFile({
+    required this.groupId,
+    required this.senderId,
+    required this.filePath,
+  });
+
+  @override
+  List<Object> get props => [groupId, senderId, filePath];
+}
+
 class AutoRefresh extends GroupChatEvent {
   final int groupId;
 

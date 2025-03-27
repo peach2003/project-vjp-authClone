@@ -4,18 +4,20 @@ class GroupMessageInput extends StatelessWidget {
   final TextEditingController controller;
   final bool isTyping;
   final VoidCallback onSendPressed;
+  final VoidCallback onEllipsisPressed;
   final VoidCallback onMicPressed;
+  final VoidCallback onStickerPressed;
   final VoidCallback onImagePressed;
-  final VoidCallback onMorePressed;
 
   const GroupMessageInput({
     Key? key,
     required this.controller,
     required this.isTyping,
     required this.onSendPressed,
+    required this.onEllipsisPressed,
     required this.onMicPressed,
+    required this.onStickerPressed,
     required this.onImagePressed,
-    required this.onMorePressed,
   }) : super(key: key);
 
   @override
@@ -26,48 +28,61 @@ class GroupMessageInput extends StatelessWidget {
         color: Colors.white,
         boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
-      child: Row(
-        children: [
-          if (!isTyping)
-            IconButton(
-              icon: Icon(
-                Icons.emoji_emotions_outlined,
-                color: Colors.grey[700],
+      child: SafeArea(
+        child: Row(
+          children: [
+            if (!isTyping)
+              IconButton(
+                icon: Image.asset(
+                  'assets/images/sticker.png',
+                  width: 24,
+                  height: 24,
+                ),
+                onPressed: onStickerPressed,
               ),
-              onPressed: () {},
-            ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: "Tin nhắn",
-                border: InputBorder.none,
+            Expanded(
+              child: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: "Tin nhắn",
+                  border: InputBorder.none,
+                ),
               ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => onSendPressed(),
             ),
-          ),
-          if (!isTyping) ...[
-            IconButton(
-              icon: Icon(Icons.more_horiz, color: Colors.grey[700]),
-              onPressed: onMorePressed,
-            ),
-            IconButton(
-              icon: Icon(Icons.mic, color: Colors.grey[700]),
-              onPressed: onMicPressed,
-            ),
-            IconButton(
-              icon: Icon(Icons.image, color: Colors.grey[700]),
-              onPressed: onImagePressed,
-            ),
-          ] else
-            FloatingActionButton(
-              onPressed: onSendPressed,
-              mini: true,
-              backgroundColor: Colors.blueAccent,
-              child: Icon(Icons.send, color: Colors.white, size: 20),
-            ),
-        ],
+            if (!isTyping) ...[
+              IconButton(
+                icon: Image.asset(
+                  'assets/images/ellipsis.png',
+                  width: 24,
+                  height: 24,
+                ),
+                onPressed: onEllipsisPressed,
+              ),
+              IconButton(
+                icon: Image.asset(
+                  'assets/images/mic.png',
+                  width: 24,
+                  height: 24,
+                ),
+                onPressed: onMicPressed,
+              ),
+              IconButton(
+                icon: Image.asset(
+                  'assets/images/image.png',
+                  width: 24,
+                  height: 24,
+                ),
+                onPressed: onImagePressed,
+              ),
+            ] else
+              FloatingActionButton(
+                onPressed: onSendPressed,
+                mini: true,
+                backgroundColor: Colors.blueAccent,
+                child: Icon(Icons.send, color: Colors.white, size: 20),
+              ),
+          ],
+        ),
       ),
     );
   }

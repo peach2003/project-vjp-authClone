@@ -19,14 +19,6 @@ class GroupChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       elevation: 0,
       systemOverlayStyle: SystemUiOverlayStyle.light,
-      title: Text(
-        groupName,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -36,21 +28,44 @@ class GroupChatAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ),
+      title: Text(
+        groupName,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
       leading: IconButton(
         onPressed: onBackPressed,
         icon: Icon(Icons.arrow_back_ios, color: Colors.white),
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.phone, color: Colors.white),
+          icon: Image.asset(
+            'assets/images/telephone1.png',
+            width: 20,
+            height: 20,
+            color: Colors.white,
+          ),
           onPressed: () {},
         ),
         IconButton(
-          icon: Icon(Icons.video_call, color: Colors.white),
+          icon: Image.asset(
+            'assets/images/video.png',
+            width: 24,
+            height: 24,
+            color: Colors.white,
+          ),
           onPressed: () {},
         ),
         IconButton(
-          icon: Icon(Icons.menu, color: Colors.white),
+          icon: Image.asset(
+            'assets/images/list.png',
+            width: 24,
+            height: 24,
+            color: Colors.white,
+          ),
           onPressed: () {},
         ),
       ],

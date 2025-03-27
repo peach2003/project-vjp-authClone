@@ -21,11 +21,11 @@ class GroupChatLoaded extends GroupChatState {
 
   bool hasNewMessages(GroupChatLoaded other) {
     if (messages.length != other.messages.length) return true;
-
-    if (messages.isNotEmpty && other.messages.isNotEmpty) {
-      return messages.last['id'] != other.messages.last['id'];
+    for (int i = 0; i < messages.length; i++) {
+      if (messages[i]["messageId"] != other.messages[i]["messageId"]) {
+        return true;
+      }
     }
-
     return false;
   }
 
@@ -35,6 +35,17 @@ class GroupChatLoaded extends GroupChatState {
 }
 
 class GroupChatMessageSent extends GroupChatState {}
+
+class GroupChatUploadLoading extends GroupChatState {}
+
+class GroupChatUploadSuccess extends GroupChatState {
+  final Map<String, dynamic> uploadResult;
+
+  const GroupChatUploadSuccess({required this.uploadResult});
+
+  @override
+  List<Object> get props => [uploadResult];
+}
 
 class GroupChatError extends GroupChatState {
   final String message;

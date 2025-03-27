@@ -44,8 +44,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           icon: Image.asset(
             'assets/images/telephone1.png',
-            width: 24,
-            height: 24,
+            width: 20,
+            height: 20,
             color: Colors.white,
           ),
           onPressed: () {},

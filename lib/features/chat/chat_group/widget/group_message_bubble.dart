@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'group_message_content.dart';
 
 class GroupMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
   final bool isMe;
+  final BuildContext parentContext;
 
   const GroupMessageBubble({
     Key? key,
     required this.message,
     required this.isMe,
+    required this.parentContext,
   }) : super(key: key);
 
   @override
@@ -45,6 +48,7 @@ class GroupMessageBubble extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               if (!isMe) ...[
                 Text(
@@ -57,9 +61,11 @@ class GroupMessageBubble extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
               ],
-              Text(
-                message["message"],
-                style: TextStyle(fontSize: 16, color: Colors.black),
+              Flexible(
+                child: GroupMessageContent(
+                  message: message,
+                  parentContext: parentContext,
+                ),
               ),
               SizedBox(height: 4),
               Align(
