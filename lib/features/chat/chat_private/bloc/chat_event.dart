@@ -76,3 +76,20 @@ class AutoRefresh extends ChatEvent {
   @override
   List<Object> get props => [currentUserId, receiverId];
 }
+
+class LoadMoreMessages extends ChatEvent {
+  final int currentUserId;
+  final int receiverId;
+  final int page;
+  final int limit;
+
+  const LoadMoreMessages({
+    required this.currentUserId,
+    required this.receiverId,
+    required this.page,
+    required this.limit,
+  });
+
+  @override
+  List<Object> get props => [currentUserId, receiverId, page, limit];
+}

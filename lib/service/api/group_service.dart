@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'dart:io';
 
 class GroupService {
   final Dio _dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3000"));
@@ -47,12 +48,18 @@ class GroupService {
     int groupId,
     int senderId,
     String message,
+    String messageType,
   ) async {
     try {
       print("📤 Đang gửi tin nhắn nhóm...");
       await _dio.post(
         "/group/send-message",
-        data: {"groupId": groupId, "sender": senderId, "message": message},
+        data: {
+          "groupId": groupId,
+          "sender": senderId,
+          "message": message,
+          "message_type": messageType,
+        },
       );
       print("✅ Gửi tin nhắn nhóm thành công!");
       return true;
@@ -62,16 +69,69 @@ class GroupService {
     }
   }
 
-  /// 🔹 **Lấy lịch sử tin nhắn trong nhóm**
-  Future<List<Map<String, dynamic>>> getGroupMessages(int groupId) async {
+  /// 🔹 **Upload file trong nhóm**
+  Future<Map<String, dynamic>?> uploadGroupFile(
+    String filePath,
+    int groupId,
+    int senderId,
+    String type,
+  ) async {
+    try {
+      print("📤 Đang upload file...");
+
+      // Tạo form data
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath),
+        'groupId': groupId.toString(),
+        'sender': senderId.toString(),
+        'type': type,
+      });
+
+      // Upload file
+      final response = await _dio.post(
+        '/group/upload',
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
+
+      if (response.statusCode == 200) {
+        print("✅ Upload thành công!");
+        return response.data;
+      } else {
+        print("❌ Upload thất bại: ${response.data['error']}");
+        return null;
+      }
+    } catch (e) {
+      print("❌ Lỗi khi upload file: $e");
+      return null;
+    }
+  }
+
+  /// 🔹 **Lấy lịch sử tin nhắn trong nhóm với phân trang**
+  Future<Map<String, dynamic>> getGroupMessages(
+    int groupId, {
+    int page = 1,
+    int limit = 10,
+  }) async {
     try {
       print("📤 Đang lấy lịch sử tin nhắn nhóm...");
-      final response = await _dio.get("/group/messages/$groupId");
+      final response = await _dio.get(
+        "/group/messages/$groupId",
+        queryParameters: {"page": page, "limit": limit},
+      );
       print("✅ Response từ server: ${response.data}");
-      return List<Map<String, dynamic>>.from(response.data);
+      return response.data;
     } catch (e) {
       print("❌ Lỗi khi lấy lịch sử tin nhắn nhóm: $e");
-      return [];
+      return {
+        "messages": [],
+        "pagination": {
+          "currentPage": page,
+          "totalPages": 1,
+          "totalMessages": 0,
+          "messagesPerPage": limit,
+        },
+      };
     }
   }
 }

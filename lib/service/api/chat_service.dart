@@ -28,19 +28,34 @@ class ChatService {
   }
 
   // 🔹 Lấy lịch sử tin nhắn giữa 2 người
-  Future<List<Map<String, dynamic>>> getChatHistory(
+  Future<Map<String, dynamic>> getChatHistory(
     int sender,
-    int receiver,
-  ) async {
+    int receiver, {
+    int page = 1,
+    int limit = 10,
+  }) async {
     try {
       final response = await _dio.get(
         "/chat/history",
-        queryParameters: {"sender": sender, "receiver": receiver},
+        queryParameters: {
+          "sender": sender,
+          "receiver": receiver,
+          "page": page,
+          "limit": limit,
+        },
       );
-      return List<Map<String, dynamic>>.from(response.data);
+      return response.data;
     } catch (e) {
       print("❌ Lỗi khi lấy lịch sử chat: $e");
-      return [];
+      return {
+        "messages": [],
+        "pagination": {
+          "currentPage": page,
+          "totalPages": 1,
+          "totalMessages": 0,
+          "messagesPerPage": limit,
+        },
+      };
     }
   }
 

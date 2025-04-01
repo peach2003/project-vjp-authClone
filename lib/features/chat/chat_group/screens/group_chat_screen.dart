@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../bloc/group_chat_bloc.dart';
 import '../bloc/group_chat_event.dart';
 import '../bloc/group_chat_state.dart';
+import '../widget/group_chat_app_bar.dart';
+import '../widget/group_message_bubble.dart';
+import '../widget/group_message_input.dart';
+import '../widget/group_options_grid.dart';
 
 class GroupChatScreen extends StatelessWidget {
   final int currentUserId;
@@ -22,7 +26,9 @@ class GroupChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => GroupChatBloc()..add(FetchGroupMessages(groupId)),
+      create:
+          (context) =>
+              GroupChatBloc()..add(FetchGroupChatHistory(groupId: groupId)),
       child: _GroupChatContent(
         currentUserId: currentUserId,
         groupId: groupId,
@@ -51,12 +57,25 @@ class _GroupChatContent extends StatefulWidget {
 class _GroupChatContentState extends State<_GroupChatContent> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool isTyping = false;
+  bool _isLoadingMore = false;
+  bool _shouldScrollToBottom = false;
+  double? _previousScrollPosition;
+
   Timer? _refreshTimer;
+  List<Map<String, dynamic>> messages = [];
+  bool isTyping = false;
+  bool showOptions = false;
+  late GroupChatBloc _groupChatBloc;
 
   @override
   void initState() {
     super.initState();
+    _groupChatBloc = GroupChatBloc();
+    _shouldScrollToBottom = true;
+
+    _groupChatBloc.add(FetchGroupChatHistory(groupId: widget.groupId));
+
+    startAutoRefresh();
 
     _messageController.addListener(() {
       setState(() {
@@ -64,298 +83,280 @@ class _GroupChatContentState extends State<_GroupChatContent> {
       });
     });
 
-    startAutoRefresh();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom(force: true);
-    });
+    _scrollController.addListener(_onScroll);
   }
 
   void startAutoRefresh() {
-    _refreshTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (mounted) {
-        context.read<GroupChatBloc>().add(AutoRefresh(widget.groupId));
+    _refreshTimer = Timer.periodic(Duration(seconds: 3), (timer) {
+      if (!_isLoadingMore && mounted) {
+        _groupChatBloc.add(AutoRefreshGroup(groupId: widget.groupId));
       }
     });
   }
 
-  void _scrollToBottom({bool force = false}) {
-    if (!_scrollController.hasClients) return;
+  void _onScroll() {
+    if (!_isLoadingMore &&
+        _scrollController.hasClients &&
+        messages.length >= 10 &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200) {
+      _previousScrollPosition = _scrollController.position.pixels;
+      _loadMoreMessages();
+    }
+  }
 
-    Future.delayed(Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 200),
-          curve: Curves.easeOut,
+  void _loadMoreMessages() {
+    final currentState = _groupChatBloc.state;
+    if (currentState is GroupChatLoaded) {
+      final pagination = currentState.pagination;
+      final nextPage = pagination['currentPage'] + 1;
+
+      if (nextPage <= pagination['totalPages']) {
+        setState(() {
+          _isLoadingMore = true;
+        });
+
+        _groupChatBloc.add(
+          LoadMoreGroupMessages(
+            groupId: widget.groupId,
+            page: nextPage,
+            limit: pagination['messagesPerPage'],
+          ),
         );
       }
+    }
+  }
+
+  void _sendMessage() async {
+    if (_messageController.text.trim().isEmpty) return;
+
+    final messageText = _messageController.text.trim();
+    _messageController.clear();
+
+    final newMessage = {
+      "sender": widget.currentUserId,
+      "message": messageText,
+      "message_type": "text",
+      "created_at": DateTime.now().toIso8601String(),
+    };
+
+    setState(() {
+      messages.insert(0, newMessage);
+      isTyping = false;
+      _shouldScrollToBottom = true;
     });
+
+    _groupChatBloc.add(
+      SendGroupMessage(
+        groupId: widget.groupId,
+        senderId: widget.currentUserId,
+        message: messageText,
+        messageType: "text",
+      ),
+    );
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     _messageController.dispose();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _groupChatBloc.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildCustomAppBar(),
-      backgroundColor: Color(0xFFF1F1F1),
-      body: Column(
-        children: [
-          Expanded(
-            child: BlocConsumer<GroupChatBloc, GroupChatState>(
-              listenWhen: (previous, current) {
-                if (previous is GroupChatLoaded && current is GroupChatLoaded) {
-                  return previous.hasNewMessages(current);
-                }
-                return true;
-              },
-              listener: (context, state) {
-                if (state is GroupChatLoaded) {
-                  _scrollToBottom();
-                } else if (state is GroupChatMessageSent) {
-                  context.read<GroupChatBloc>().add(
-                    FetchGroupMessages(widget.groupId),
-                  );
-                } else if (state is GroupChatError) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(state.message)));
-                }
-              },
-              buildWhen: (previous, current) {
-                if (previous is GroupChatLoaded && current is GroupChatLoaded) {
-                  return previous.hasNewMessages(current);
-                }
-                return true;
-              },
-              builder: (context, state) {
-                if (state is GroupChatInitial ||
-                    (state is GroupChatLoading && state is! GroupChatLoaded)) {
-                  return Center(child: CircularProgressIndicator());
-                }
+    return BlocProvider.value(
+      value: _groupChatBloc,
+      child: Builder(
+        builder: (context) {
+          return BlocListener<GroupChatBloc, GroupChatState>(
+            listener: (context, state) {
+              if (state is GroupChatError) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(state.message)));
+              } else if (state is GroupChatLoaded) {
+                final wasAtBottom =
+                    _scrollController.hasClients &&
+                    _scrollController.position.pixels <= 50;
 
-                if (state is GroupChatLoaded) {
-                  if (state.messages.isEmpty) {
-                    return Center(child: Text('Chưa có tin nhắn nào'));
+                setState(() {
+                  messages = List<Map<String, dynamic>>.from(state.messages);
+                  _isLoadingMore = false;
+                });
+
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (state.isFirstLoad || _shouldScrollToBottom) {
+                    _shouldScrollToBottom = false;
+                    _scrollToBottom();
+                  } else if (wasAtBottom && !_isLoadingMore) {
+                    _scrollToBottom();
+                  } else if (_isLoadingMore &&
+                      _previousScrollPosition != null) {
+                    _scrollController.jumpTo(_previousScrollPosition!);
+                    _previousScrollPosition = null;
                   }
-
-                  return ListView.builder(
-                    key: PageStorageKey('chat_messages'),
-                    controller: _scrollController,
-                    itemCount: state.messages.length,
-                    itemBuilder: (context, index) {
-                      final message = state.messages[index];
-                      bool isMe = message["sender"] == widget.currentUserId;
-                      return _buildMessageBubble(message, isMe);
-                    },
-                  );
-                }
-
-                if (state is GroupChatError) {
-                  return Center(child: Text('Đã xảy ra lỗi: ${state.message}'));
-                }
-
-                return Container();
-              },
+                });
+              }
+            },
+            child: Scaffold(
+              appBar: GroupChatAppBar(
+                groupName: widget.groupName,
+                onBackPressed: () => Navigator.pop(context),
+              ),
+              backgroundColor: Color(0xFFF1F1F1),
+              body: _buildBody(context),
             ),
-          ),
-          _buildMessageInput(),
-        ],
+          );
+        },
       ),
     );
   }
 
-  PreferredSizeWidget _buildCustomAppBar() {
-    return AppBar(
-      elevation: 0,
-      systemOverlayStyle: SystemUiOverlayStyle.light,
-      title: Text(
-        widget.groupName,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-      flexibleSpace: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF007AFF), Color(0xFF4A90E2)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-      ),
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: Icon(Icons.arrow_back_ios, color: Colors.white),
-      ),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.phone, color: Colors.white),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: Icon(Icons.video_call, color: Colors.white),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: Icon(Icons.menu, color: Colors.white),
-          onPressed: () {},
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
-    DateTime messageTime =
-        message["created_at"] is String
-            ? DateTime.parse(message["created_at"]).toLocal()
-            : message["created_at"];
-
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: IntrinsicWidth(
-        child: Container(
-          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 10),
-          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.66,
-          ),
-          decoration: BoxDecoration(
-            color: isMe ? Color(0xFFDCF8C6) : Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-              bottomLeft: isMe ? Radius.circular(12) : Radius.circular(0),
-              bottomRight: isMe ? Radius.circular(0) : Radius.circular(12),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 3,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (!isMe) ...[
-                Text(
-                  message["username"] ?? "Unknown",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 4),
-              ],
-              Text(
-                message["message"],
-                style: TextStyle(fontSize: 16, color: Colors.black),
-              ),
-              SizedBox(height: 4),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Text(
-                  DateFormat('HH:mm').format(messageTime),
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
-      ),
-      child: Row(
+  Widget _buildBody(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (showOptions) {
+          setState(() {
+            showOptions = false;
+          });
+        }
+      },
+      child: Stack(
         children: [
-          if (!isTyping)
-            IconButton(
-              icon: Icon(
-                Icons.emoji_emotions_outlined,
-                color: Colors.grey[700],
-              ),
-              onPressed: () {},
-            ),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: "Tin nhắn",
-                border: InputBorder.none,
-              ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) {
-                final message = _messageController.text.trim();
-                if (message.isNotEmpty) {
-                  context.read<GroupChatBloc>().add(
-                    SendGroupMessage(
-                      groupId: widget.groupId,
-                      senderId: widget.currentUserId,
-                      message: message,
+          BlocBuilder<GroupChatBloc, GroupChatState>(
+            builder: (context, state) {
+              if (state is GroupChatLoading && messages.isEmpty) {
+                return Center(child: CircularProgressIndicator());
+              }
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        ListView.builder(
+                          controller: _scrollController,
+                          reverse: true,
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            bool isMe =
+                                message["sender"] == widget.currentUserId;
+                            return GroupMessageBubble(
+                              message: message,
+                              isMe: isMe,
+                              parentContext: context,
+                            );
+                          },
+                        ),
+                        if (_isLoadingMore)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              color: Colors.black12,
+                              padding: EdgeInsets.all(8.0),
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                          ),
+                      ],
                     ),
-                  );
-                  _messageController.clear();
-                  setState(() {
-                    isTyping = false;
-                  });
-                }
-              },
-            ),
+                  ),
+                  GroupMessageInput(
+                    controller: _messageController,
+                    isTyping: isTyping,
+                    onSendPressed: _sendMessage,
+                    onEllipsisPressed: () {
+                      setState(() {
+                        showOptions = !showOptions;
+                        if (showOptions) {
+                          FocusScope.of(context).unfocus();
+                        }
+                      });
+                    },
+                    onMicPressed: () {},
+                    onStickerPressed: () {},
+                    onImagePressed: () async {
+                      final ImagePicker picker = ImagePicker();
+                      try {
+                        final XFile? image = await picker.pickImage(
+                          source: ImageSource.gallery,
+                        );
+
+                        if (image != null && mounted) {
+                          setState(() {
+                            showOptions = false;
+                          });
+
+                          _groupChatBloc.add(
+                            SendGroupImageOrVideo(
+                              groupId: widget.groupId,
+                              senderId: widget.currentUserId,
+                              filePath: image.path,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Lỗi khi chọn ảnh: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  if (showOptions)
+                    GroupOptionsGrid(
+                      currentUserId: widget.currentUserId,
+                      groupId: widget.groupId,
+                      setShowOptions: (value) {
+                        setState(() {
+                          showOptions = value;
+                        });
+                      },
+                    ),
+                ],
+              );
+            },
           ),
-          if (!isTyping) ...[
-            IconButton(
-              icon: Icon(Icons.more_horiz, color: Colors.grey[700]),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: Icon(Icons.mic, color: Colors.grey[700]),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: Icon(Icons.image, color: Colors.grey[700]),
-              onPressed: () {},
-            ),
-          ] else
-            FloatingActionButton(
-              onPressed: () {
-                final message = _messageController.text.trim();
-                if (message.isNotEmpty) {
-                  context.read<GroupChatBloc>().add(
-                    SendGroupMessage(
-                      groupId: widget.groupId,
-                      senderId: widget.currentUserId,
-                      message: message,
+          BlocBuilder<GroupChatBloc, GroupChatState>(
+            builder: (context, state) {
+              if (state is GroupChatUploadLoading) {
+                return Container(
+                  color: Colors.black.withOpacity(0.5),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 16),
+                        Text(
+                          'Đang gửi tệp...',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ],
                     ),
-                  );
-                  _messageController.clear();
-                  setState(() {
-                    isTyping = false;
-                  });
-                }
-              },
-              mini: true,
-              backgroundColor: Colors.blueAccent,
-              child: Icon(Icons.send, color: Colors.white, size: 20),
-            ),
+                  ),
+                );
+              }
+              return SizedBox.shrink();
+            },
+          ),
         ],
       ),
     );

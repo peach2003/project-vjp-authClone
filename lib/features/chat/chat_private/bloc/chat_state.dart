@@ -13,11 +13,17 @@ class ChatLoading extends ChatState {}
 
 class ChatLoaded extends ChatState {
   final List<Map<String, dynamic>> messages;
+  final Map<String, dynamic> pagination;
+  final bool isFirstLoad;
 
-  const ChatLoaded({required this.messages});
+  const ChatLoaded({
+    required this.messages,
+    required this.pagination,
+    this.isFirstLoad = false,
+  });
 
   @override
-  List<Object> get props => [messages];
+  List<Object> get props => [messages, pagination];
 }
 
 class ChatMessageSent extends ChatState {}
